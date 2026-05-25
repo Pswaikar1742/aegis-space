@@ -21,6 +21,17 @@ export const SPACES: FloorSpace[] = [
   { id: "phone_booth_a", label: "Booth A", kind: "conference_room", shape: "circle", x: 350, y: 295, r: 28, capacity: 2, monthlyRate: 520 },
 ];
 
+export function mapSpaceToInventory(space: FloorSpace): InventoryItem {
+  return {
+    id: space.id,
+    name: space.label,
+    type: space.kind === 'conference_room' ? 'meeting_room' : (space.kind as string),
+    status: 'available',
+    capacity: space.capacity,
+    monthly_rate: space.monthlyRate,
+  } as InventoryItem;
+}
+
 function normalizeName(v: string) { return v.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim(); }
 
 function findMatch(space: FloorSpace, inv: InventoryItem[]): InventoryItem | null {
