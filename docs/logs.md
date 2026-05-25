@@ -163,3 +163,61 @@ Replace `_extract_deal_signals()` in `nexus.py` with an LLM call (Gemini/GPT). T
 - Backend: Core infrastructure (config, db, models, endpoints), plus placeholders for Dockerfile, deploy.sh, and ai_parser.py
 - Frontend: Next.js app shell (layout, page, globals), API helper, config files, plus placeholders for components and tailwind config
 - Docs: Updated status.md and logs.md with full project history
+
+---
+
+## 2026-05-25T13:46:00+05:30 — Antigravity Production AI Engine Build
+
+**Agent:** Antigravity (Storage & Transactional Systems Engineer)  
+**Branch:** `feature/production-ai`  
+**Protocol:** Aegis Shared-State Protocol v1
+
+### Pre-flight
+
+1. **Read shared-state** — Confirmed `POST /api/v1/nexus/orchestrate` was at mock v0.1.0. Supabase connectivity validated (HTTP 200). Config `extra="ignore"` patch needed.
+2. **Checked git branches** — `feature/production-ai` existed locally and on remote with only a marker commit. Merged `feature/skeleton-frontend` to bring in all skeleton code.
+
+### Actions Performed
+
+1. **Updated `backend/app/core/config.py`** — Added FastRouter fields (`FASTROUTER_API_KEY`, `FASTROUTER_BASE_URL`, `FASTROUTER_MODEL`), mapped both `SUPABASE_KEY` and `SUPABASE_SERVICE_KEY`, added `extra="ignore"` to `SettingsConfigDict`, bumped version to `1.0.0`.
+
+2. **Updated `backend/requirements.txt`** — Added `openai>=1.60.0,<2.0.0` for the `AsyncOpenAI` client. No `google-generativeai` was present to remove.
+
+3. **Created `backend/app/services/ai_service.py`** — FastRouter AI parsing service:
+   - `AsyncOpenAI` client pointed at `FASTROUTER_BASE_URL` with `FASTROUTER_API_KEY`.
+   - Structured system prompt extracts: `company_name`, `required_capacity`, `requested_type` (strictly mapped to: hot_desk, dedicated_desk, private_office, meeting_room), `budget`, `contact_email`.
+   - `json_object` response format with `temperature=0.1` for deterministic extraction.
+   - `ParsedDealSignals` Pydantic model validates output with `field_validator` on `requested_type`.
+   - `AIParserError` exception class for structured error propagation.
+   - Sentinel detection: empty company + 0 capacity + empty type = no deal signals.
+
+4. **Updated `backend/app/models/nexus.py`** — Extended from mock schemas:
+   - New `HaltReason` values: `ai_parse_failed`, `no_inventory_match`, `capacity_exceeded`, `budget_exceeded`, `database_error`.
+   - `OrchestrateResponse` now includes: `halt_detail`, `matched_inventory`, `lead_record`, `booking_record`.
+   - `pipeline_version` bumped to `v1.0.0-fastrouter`.
+
+5. **Overwritten `backend/app/api/v1/endpoints/nexus.py`** — Full 4-stage allocation pipeline:
+   - **Stage 1**: Placeholder guard (unchanged from mock).
+   - **Stage 2**: `await parse_deal_signals(email_body)` via FastRouter. On failure → create `workbench_halted` lead → return Halted.
+   - **Stage 3**: Query `inventory_items` WHERE `type` = requested_type AND `status` = available AND `capacity` >= required AND `monthly_rate` <= budget. Three-tier filtering with distinct halt reasons.
+   - **Stage 4 (Happy)**: Pick cheapest match → UPDATE inventory to allocated → INSERT lead as closed_won → INSERT booking as confirmed → return Success with all records.
+   - **Stage 4 (Exception)**: INSERT lead as workbench_halted with specific `next_steps` → return Halted with reason.
+   - **Rollback**: If Stage 4 writes fail partway, attempt to restore inventory to available.
+
+6. **Updated `docs/status.md`** — Full endpoint inventory with versions, production AI files tracked, branch status updated.
+
+7. **Updated `docs/logs.md`** — This entry.
+
+### Design Decisions
+
+- **AsyncOpenAI over httpx**: The `openai` SDK's `AsyncOpenAI` class handles retries, streaming, and error taxonomy natively. Pointing `base_url` at FastRouter makes it a drop-in proxy.
+- **json_object response format**: Forces the LLM to return valid JSON, eliminating markdown fence stripping. Combined with low temperature (0.1) for maximum extraction consistency.
+- **Cheapest-match allocation**: When multiple inventory items match, the pipeline picks the lowest `monthly_rate`. This optimizes for the client's budget. Can be made configurable.
+- **Halted leads for traceability**: Even when the pipeline halts, a `workbench_halted` lead is created so sales teams can follow up manually. The `next_steps` field carries the specific failure reason.
+- **Best-effort rollback**: Since Supabase REST doesn't support multi-table transactions, the pipeline attempts to restore inventory status if downstream writes fail. Not atomic, but best available without Postgres RPC functions.
+
+### Risks / Notes
+
+- **No DDL yet**: Tables must exist in Supabase before the pipeline can execute. Inventory must be seeded with available items.
+- **FastRouter rate limits**: Not handled in this iteration. The `openai` SDK's built-in retry logic covers transient failures.
+- **Single-month booking**: The pipeline creates 30-day bookings by default. Duration negotiation is not yet supported.

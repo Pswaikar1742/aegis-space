@@ -2,13 +2,14 @@
 AegiSpace — Application Configuration
 
 Loads all environment variables with validation via pydantic-settings.
-Supabase credentials are mandatory; the app will fail-fast at import time
+All credentials are mandatory; the app will fail-fast at import time
 if they're missing, preventing silent mis-configuration in production.
 """
 
 from functools import lru_cache
+from typing import Optional
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -16,21 +17,30 @@ class Settings(BaseSettings):
 
     # ── Supabase ──────────────────────────────────────────────────────────
     SUPABASE_URL: str
-    SUPABASE_SERVICE_KEY: str  # Use the *service-role* key for backend ops
+    SUPABASE_KEY: Optional[str] = None          # Publishable key (unused in backend)
+    SUPABASE_SERVICE_KEY: str                    # Service-role key for privileged ops
+
+    # ── FastRouter LLM ────────────────────────────────────────────────────
+    FASTROUTER_API_KEY: str
+    FASTROUTER_BASE_URL: str = "https://api.fastrouter.io/v1"
+    FASTROUTER_MODEL: str = "gpt-4o"
 
     # ── Application ───────────────────────────────────────────────────────
     APP_NAME: str = "AegiSpace"
-    APP_VERSION: str = "0.1.0"
+    APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
+    PORT: int = 8080
 
     # ── CORS ──────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
 
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "case_sensitive": True,
-    }
+    # Crucial: ignore extra keys in .env that aren't modeled here
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
 
 @lru_cache(maxsize=1)

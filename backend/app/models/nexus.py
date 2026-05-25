@@ -1,16 +1,18 @@
 """
-AegiSpace — Nexus Orchestration Pydantic Schemas
+AegiSpace — Nexus Orchestration Pydantic Schemas (Production v1.0.0)
 
-Request/response validation for the deal orchestration pipeline.
-These schemas define the contract boundary between the API layer
-and the (future) AI/LLM decision engine.
+Request/response validation for the AI-driven deal orchestration pipeline.
+Extended from the mock schemas to support the full allocation pipeline:
+  - AI-extracted deal parameters
+  - Inventory match results
+  - Lead + booking records created
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +21,7 @@ from pydantic import BaseModel, Field
 
 
 class OrchestrateDecision(str, Enum):
-    """Deterministic decision outcomes from the orchestration pipeline."""
+    """Decision outcomes from the orchestration pipeline."""
 
     SUCCESS = "Success"
     HALTED = "Halted"
@@ -29,9 +31,13 @@ class HaltReason(str, Enum):
     """Machine-readable reasons for a Halted decision."""
 
     EMPTY_EMAIL_BODY = "empty_email_body"
-    MISSING_BRANCH = "missing_branch"
-    NO_DEAL_SIGNALS = "no_deal_signals"
     PLACEHOLDER_INPUT = "placeholder_input"
+    AI_PARSE_FAILED = "ai_parse_failed"
+    NO_DEAL_SIGNALS = "no_deal_signals"
+    NO_INVENTORY_MATCH = "no_inventory_match"
+    CAPACITY_EXCEEDED = "capacity_exceeded"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    DATABASE_ERROR = "database_error"
 
 
 # ── Request Schema ────────────────────────────────────────────────────────
@@ -60,20 +66,36 @@ class OrchestrateRequest(BaseModel):
 
 
 class OrchestrateResponse(BaseModel):
-    """Structured response from the orchestration pipeline."""
+    """Structured response from the full allocation pipeline."""
 
     decision: OrchestrateDecision
     halt_reason: Optional[HaltReason] = None
+    halt_detail: Optional[str] = Field(
+        default=None,
+        description="Human-readable explanation when halted",
+    )
     extracted_data: Optional[dict] = Field(
         default=None,
-        description="Extracted deal fields (company, seats, budget, etc.)",
+        description="AI-extracted deal parameters (company, capacity, type, budget)",
+    )
+    matched_inventory: Optional[dict] = Field(
+        default=None,
+        description="The inventory item that was allocated (if success)",
+    )
+    lead_record: Optional[dict] = Field(
+        default=None,
+        description="The lead record created in Supabase",
+    )
+    booking_record: Optional[dict] = Field(
+        default=None,
+        description="The booking record created in Supabase (if success)",
     )
     confidence: float = Field(
         default=1.0,
         ge=0.0,
         le=1.0,
-        description="Confidence score for the decision (1.0 for deterministic mock)",
+        description="Confidence score from the AI parser",
     )
     branch_id: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    pipeline_version: str = "v0.1.0-mock"
+    pipeline_version: str = "v1.0.0-fastrouter"
