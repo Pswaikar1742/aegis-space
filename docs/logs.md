@@ -159,3 +159,19 @@
 
 - Current feature branch originally contained only marker files and README.
 - The frontend source tree for this branch was created as part of this implementation.
+
+### 2026-05-25T15:00 — Antigravity Multi-Role Engine Build
+**Branch:** `feature/production-ai`
+
+- **Database Schemas:**
+  - Designed new `members` table for multi-role support (CFO, Manager, Tenant Admin, Member).
+  - Designed `member_perks` table for room booking credits tracking.
+  - Designed `maintenance_tickets` table for localized inventory reporting.
+- **Endpoints:**
+  - Added role-based dependency `require_role(roles)` via `X-User-Role` header.
+  - `GET /api/v1/analytics/global`: CFO endpoint computing total revenue, global occupancy, and branch-level metrics.
+  - `POST / GET /api/v1/tickets`: Manager/Member endpoints for managing facility maintenance.
+  - `GET / PATCH /api/v1/members/perks`: Tenant Admin endpoint for retrieving and updating booking quotas.
+- **Robustness:**
+  - Refactored `endpoints/nexus.py` to prevent `NoneType` errors on empty allocations using safe `getattr(..., "data", None)` lookups instead of naked property access.
+  - Enforced strict dictionary `.get(key) or 0` defaults for nullable numeric fields across the engine.

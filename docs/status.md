@@ -123,6 +123,11 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | `PATCH` | `/api/v1/bookings/{booking_id}` | `endpoints/bookings.py` | v1 |
 | `GET` | `/api/v1/bookings` | `endpoints/bookings.py` | v1 |
 | `POST` | `/api/v1/nexus/orchestrate` | `endpoints/nexus.py` | v1.0.0-fastrouter |
+| `GET` | `/api/v1/analytics/global` | `endpoints/analytics.py` | v1 (CFO only) |
+| `POST` | `/api/v1/tickets` | `endpoints/tickets.py` | v1 (Manager/Member) |
+| `GET` | `/api/v1/tickets` | `endpoints/tickets.py` | v1 (Manager/Member) |
+| `GET` | `/api/v1/members/perks/{id}` | `endpoints/members.py` | v1 (Tenant Admin) |
+| `PATCH` | `/api/v1/members/perks/{id}` | `endpoints/members.py` | v1 (Tenant Admin) |
 
 ## Database Schemas
 
@@ -131,6 +136,9 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | `inventory_items` | id, branch_id, name, type, capacity, monthly_rate, status | available, allocated, maintenance |
 | `leads` | id, branch_id, company_name, contact_email, status, deal_size, next_steps | new, closed_won, workbench_halted |
 | `bookings` | id, inventory_item_id, lead_id, branch_id, start/end_date, monthly_rate_locked, total_value, status, notes | pending, confirmed, cancelled, completed |
+| `members` | id, company_name, email, role, branch_id | cfo, manager, tenant_admin, member |
+| `member_perks` | member_id, monthly_credits, printing_quota, active_status | - |
+| `maintenance_tickets` | id, branch_id, inventory_item_id, description, status, created_at | open, in_progress, resolved |
 
 ## Environment Configuration
 
