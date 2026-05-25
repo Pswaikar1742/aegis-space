@@ -1,0 +1,11 @@
+# feature/production-ai
+
+This branch tracks AI/LLM parsing and orchestration logic for deal analysis.
+
+## Scope
+- Gemini API integration for email parsing
+- Deal signal extraction and classification
+- Orchestration pipeline implementation
+
+## Status
+Ready for feature development.
