@@ -5,8 +5,8 @@ export interface InventoryItem {
   name: string;
   type: string;
   status: InventoryStatus;
-  capacity?: number;
-  monthly_rate?: number;
+  capacity: number;
+  monthly_rate: number;
   monthlyRate?: number;
 }
 

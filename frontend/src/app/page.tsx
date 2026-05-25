@@ -42,8 +42,7 @@ const SESSION_STORAGE_KEY = 'aegis-space-session';
 const ACTIVE_BRANCH_STORAGE_KEY = 'aegis-space-active-branch';
 const MEMBER_LOCATION_STORAGE_KEY = 'aegis-space-member-location';
 
-// Branch shape used for dynamic loading
-type Branch = { id: string; name: string; city?: string; note?: string };
+// Branch type imported from ../lib/types
 
 type MemberLocationFilter = 'all' | 'hot_desk' | 'dedicated_desk' | 'meeting_room' | 'private_suite';
 
@@ -509,7 +508,7 @@ export default function Home() {
       // Persist demo inventory to backend, then create a booking against it
       try {
         const demoSpace = DEMO_SPACES.find(s => s.id === itemId);
-        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', monthly_rate: 220 };
+        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', capacity: 1, monthly_rate: 220 };
 
         const createResp = await fetch(`${BACKEND_URL}/api/v1/inventory/demo`, {
           method: 'POST',
@@ -560,7 +559,7 @@ export default function Home() {
         // Fallback to local demo booking if persistence fails
         console.error('Demo persist failed, falling back to local demo booking', err);
         const demoSpace = DEMO_SPACES.find(s => s.id === itemId);
-        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', monthly_rate: 220 };
+        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', capacity: 1, monthly_rate: 220 };
         const fakeId = `demo-${Date.now()}`;
         const newBooking = {
           id: fakeId,

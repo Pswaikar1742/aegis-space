@@ -39,7 +39,9 @@ class Settings(BaseSettings):
         "http://localhost:3002",
         "http://localhost:3003",
         "http://localhost:3004",
+        "http://localhost:3005",
         "https://aegispace.vercel.app",
+        "https://aegis-space.vercel.app",
         "https://*.vercel.app",
     ]
 
