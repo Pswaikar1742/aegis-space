@@ -1,0 +1,236 @@
+"""
+AegiSpace — SQLite Database Layer
+
+Provides a thread-safe SQLite database with schema initialization and seed data.
+Replaces Supabase for a self-contained, zero-dependency deployment.
+"""
+
+import logging
+import os
+import sqlite3
+import uuid
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+DB_PATH = os.environ.get("AEGIS_DB_PATH", os.path.join(os.path.dirname(__file__), "..", "..", "aegispace.db"))
+
+def _dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
+    """Row factory that returns dictionaries instead of tuples."""
+    columns = [col[0] for col in cursor.description]
+    return dict(zip(columns, row))
+
+def get_connection() -> sqlite3.Connection:
+    """Create a new SQLite connection with dict row factory."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = _dict_factory
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
+
+# Module-level connection singleton
+_conn: sqlite3.Connection | None = None
+
+def get_db() -> sqlite3.Connection:
+    """Return the singleton database connection."""
+    global _conn
+    if _conn is None:
+        _conn = get_connection()
+    return _conn
+
+# ── Schema ────────────────────────────────────────────────────────────────
+
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS branches (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    name TEXT NOT NULL,
+    city TEXT NOT NULL,
+    address TEXT NOT NULL DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    external_id TEXT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    capacity INTEGER NOT NULL DEFAULT 1,
+    monthly_rate REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'available',
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(branch_id, name)
+);
+
+CREATE TABLE IF NOT EXISTS leads (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    company_name TEXT NOT NULL,
+    contact_email TEXT,
+    status TEXT NOT NULL DEFAULT 'new',
+    deal_size REAL DEFAULT 0,
+    next_steps TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS bookings (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    inventory_item_id TEXT NOT NULL REFERENCES inventory_items(id),
+    lead_id TEXT REFERENCES leads(id),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    monthly_rate_locked REAL NOT NULL DEFAULT 0,
+    billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+    total_value REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'pending',
+    notes TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS maintenance_tickets (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    inventory_item_id TEXT,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS member_perks (
+    member_id TEXT PRIMARY KEY,
+    monthly_credits INTEGER DEFAULT 0,
+    printing_quota INTEGER DEFAULT 0,
+    active_status INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS visitors (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    visitor_name TEXT NOT NULL,
+    company TEXT,
+    purpose TEXT NOT NULL,
+    host_member_id TEXT,
+    status TEXT NOT NULL DEFAULT 'pre_registered',
+    checked_in_at TEXT,
+    checked_out_at TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS facility_tasks (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    area TEXT NOT NULL DEFAULT '',
+    task_type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'normal',
+    status TEXT NOT NULL DEFAULT 'pending',
+    notes TEXT,
+    assigned_to TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL,
+    user_id TEXT,
+    type TEXT NOT NULL,
+    payload TEXT,
+    read INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
+
+# ── Seed Data ────────────────────────────────────────────────────────────
+
+KALYAN_ID  = "4a7b9c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d"
+BKC_ID     = "8b9c1d2e-3f4a-5b6c-7d8e-9f0a1b2c3d4e"
+HYD_ID     = "9c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f"
+STARK_ID   = "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+
+def _seed(conn: sqlite3.Connection):
+    """Insert initial data only if tables are empty."""
+    cur = conn.cursor()
+    count = cur.execute("SELECT COUNT(*) as c FROM branches").fetchone()["c"]
+    if count > 0:
+        logger.info("Database already seeded (%d branches), skipping.", count)
+        return
+
+    logger.info("Seeding database with initial data...")
+
+    # Branches
+    cur.executemany(
+        "INSERT INTO branches (id, name, city, address) VALUES (?, ?, ?, ?)",
+        [
+            (KALYAN_ID,  "Kalyan Center",  "Mumbai Metropolitan Region", "Kalyan West, Thane District"),
+            (BKC_ID,     "BKC Tower",      "Mumbai",                     "Bandra Kurla Complex, Mumbai 400051"),
+            (HYD_ID,     "Hyderabad Hub",  "Hyderabad",                  "HITEC City, Madhapur, Hyderabad 500081"),
+        ]
+    )
+
+    # Inventory — Kalyan
+    kalyan_inv = [
+        (str(uuid.uuid4()), KALYAN_ID, "hot_desk_1",        "HD-01",                 "hot_desk",       1,  220, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "hot_desk_2",        "HD-02",                 "hot_desk",       1,  220, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "hot_desk_3",        "HD-03",                 "hot_desk",       1,  220, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "hot_desk_4",        "HD-04",                 "hot_desk",       1,  220, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "hot_desk_5",        "HD-05",                 "hot_desk",       1,  220, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "hot_desk_6",        "HD-06",                 "hot_desk",       1,  220, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "dedicated_seat_40", "Dedicated Seat #40",    "dedicated_desk", 1,  350, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "conference_alpha",  "Conference Room Alpha", "meeting_room",   12, 1800, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "suite_203",         "Private Suite 203",     "private_suite",  6,  4200, "available"),
+        (str(uuid.uuid4()), KALYAN_ID, "phone_booth_a",     "Phone Booth A",         "meeting_room",   2,  520, "available"),
+    ]
+    # Inventory — BKC
+    bkc_inv = [
+        (str(uuid.uuid4()), BKC_ID, "bkc_hot_1",   "BKC-HD-01",          "hot_desk",       1,  280, "available"),
+        (str(uuid.uuid4()), BKC_ID, "bkc_hot_2",   "BKC-HD-02",          "hot_desk",       1,  280, "available"),
+        (str(uuid.uuid4()), BKC_ID, "bkc_hot_3",   "BKC-HD-03",          "hot_desk",       1,  280, "available"),
+        (str(uuid.uuid4()), BKC_ID, "bkc_ded_1",   "BKC-DS-01",          "dedicated_desk", 1,  450, "available"),
+        (str(uuid.uuid4()), BKC_ID, "bkc_conf_a",  "BKC Conference A",   "meeting_room",   10, 2200, "available"),
+        (str(uuid.uuid4()), BKC_ID, "bkc_suite_1", "BKC Executive Suite","private_suite",  8,  5200, "available"),
+    ]
+    # Inventory — Hyderabad
+    hyd_inv = [
+        (str(uuid.uuid4()), HYD_ID, "hyd_hot_1",   "HYD-HD-01",          "hot_desk",       1,  200, "available"),
+        (str(uuid.uuid4()), HYD_ID, "hyd_hot_2",   "HYD-HD-02",          "hot_desk",       1,  200, "available"),
+        (str(uuid.uuid4()), HYD_ID, "hyd_ded_1",   "HYD-DS-01",          "dedicated_desk", 1,  380, "available"),
+        (str(uuid.uuid4()), HYD_ID, "hyd_conf_a",  "HYD Conference A",   "meeting_room",   8,  1600, "available"),
+        (str(uuid.uuid4()), HYD_ID, "hyd_suite_1", "HYD Innovation Suite","private_suite", 10, 3800, "available"),
+    ]
+
+    cur.executemany(
+        "INSERT INTO inventory_items (id, branch_id, external_id, name, type, capacity, monthly_rate, status) VALUES (?,?,?,?,?,?,?,?)",
+        kalyan_inv + bkc_inv + hyd_inv,
+    )
+
+    # Leads
+    cur.executemany(
+        "INSERT INTO leads (id, branch_id, company_name, contact_email, status, deal_size, next_steps) VALUES (?,?,?,?,?,?,?)",
+        [
+            (str(uuid.uuid4()), KALYAN_ID, "Wayne Enterprises",  "bruce@wayne.com",   "new",           15000, "Site visit scheduled"),
+            (str(uuid.uuid4()), KALYAN_ID, "Stark Industries",   "pepper@stark.com",  "closed_won",    42000, "Contract signed"),
+            (str(uuid.uuid4()), BKC_ID,    "Oscorp",             "norman@oscorp.com", "proposal_sent", 28000, "Awaiting VP approval"),
+            (str(uuid.uuid4()), HYD_ID,    "LexCorp",            "lex@lexcorp.com",   "new",           22000, "Initial inquiry"),
+        ]
+    )
+
+    # Member Perks
+    cur.execute(
+        "INSERT INTO member_perks (member_id, monthly_credits, printing_quota, active_status) VALUES (?, ?, ?, ?)",
+        (STARK_ID, 240, 1000, 1),
+    )
+
+    conn.commit()
+    logger.info("Database seeded successfully with 3 branches and %d inventory items.", len(kalyan_inv) + len(bkc_inv) + len(hyd_inv))
+
+
+def init_db():
+    """Initialize the database schema and seed data."""
+    conn = get_db()
+    conn.executescript(SCHEMA_SQL)
+    _seed(conn)
+    logger.info("SQLite database initialized at %s", os.path.abspath(DB_PATH))
+

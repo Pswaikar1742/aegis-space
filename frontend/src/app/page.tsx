@@ -502,100 +502,6 @@ export default function Home() {
   const bookRoom = async (itemId: string, role: string, billing_cycle: string = 'monthly', notes?: string) => {
     setTerminalLog(`Validating booking credits for ${role}...`);
     setBookingAction('Submitting booking request...');
-    // If the itemId isn't present in the backend-fetched inventory, treat as demo/local booking
-    const localMatch = inventory.find(i => i.id === itemId);
-    if (!localMatch) {
-      // Persist demo inventory to backend, then create a booking against it
-      try {
-        const demoSpace = DEMO_SPACES.find(s => s.id === itemId);
-        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', capacity: 1, monthly_rate: 220 };
-
-        const createResp = await fetch(`${BACKEND_URL}/api/v1/inventory/demo`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID },
-          body: JSON.stringify({
-            branch_id: activeBranchId,
-            external_id: itemId,
-            name: demoItem.name,
-            type: demoItem.type,
-            capacity: demoItem.capacity || 1,
-            monthly_rate: demoItem.monthly_rate || 0,
-          }),
-        });
-
-        if (!createResp.ok) {
-          throw new Error('Failed to create demo inventory');
-        }
-
-        const created = await createResp.json();
-
-        // Now create a booking against the created inventory id
-        const bookingResp = await fetch(`${BACKEND_URL}/api/v1/bookings`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID },
-          body: JSON.stringify({
-            inventory_item_id: created.id,
-            branch_id: activeBranchId,
-            lead_id: leads.find((lead) => lead.company_name.toLowerCase().includes('stark'))?.id ?? null,
-            start_date: bookingStartDate,
-            end_date: bookingEndDate,
-            billing_cycle: billing_cycle,
-            notes: notes ?? `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
-          }),
-        });
-
-        const payload = await bookingResp.json();
-        if (bookingResp.ok) {
-          addToast('Booking successful');
-          fetchState();
-          return true;
-        }
-
-        // If booking failed after inventory creation, surface error
-        setBookingAction(`Booking blocked: ${payload?.detail || 'request rejected'}`);
-        setTerminalLog(`✗ BLOCKED:\n${JSON.stringify(payload, null, 2)}`);
-        return false;
-      } catch (err) {
-        // Fallback to local demo booking if persistence fails
-        console.error('Demo persist failed, falling back to local demo booking', err);
-        const demoSpace = DEMO_SPACES.find(s => s.id === itemId);
-        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', capacity: 1, monthly_rate: 220 };
-        const fakeId = `demo-${Date.now()}`;
-        const newBooking = {
-          id: fakeId,
-          inventory_item_id: demoItem.id,
-          lead_id: null,
-          branch_id: activeBranchId,
-          start_date: bookingStartDate,
-          end_date: bookingEndDate,
-          monthly_rate_locked: demoItem.monthly_rate || 0,
-          total_value: billing_cycle === 'daily' ? Math.round((demoItem.monthly_rate || 0) / 30 * (Math.max((new Date(bookingEndDate).getTime() - new Date(bookingStartDate).getTime()) / (1000*60*60*24), 1))) : (demoItem.monthly_rate || 0),
-          status: 'confirmed',
-          notes: notes ?? `Demo booking by ${PERSONA_CREDENTIALS[persona].label}`,
-          created_at: new Date().toISOString(),
-        } as BookingRecord;
-        setBookings((prev) => [newBooking, ...prev]);
-        setInventory((prev) => {
-        const normalized = {
-          id: demoItem.id,
-          name: demoItem.name,
-          type: demoItem.type,
-          status: 'allocated' as const,
-          capacity: (demoItem.capacity ?? 1) as number,
-          monthly_rate: (demoItem.monthly_rate ?? (demoItem as any).monthlyRate ?? 0) as number,
-        } as InventoryItem;
-
-        const exists = prev.find(p => p.id === demoItem.id);
-        if (exists) return prev.map(p => p.id === demoItem.id ? { ...p, status: 'allocated' } : p);
-        return [normalized, ...prev];
-      });
-        setOpenSlots((s) => Math.max(0, s - 1));
-        addToast('Booking successful (demo)');
-        setBookingAction(`Demo reserved ${demoItem.name} successfully.`);
-        setTerminalLog(`✓ DEMO BOOKING: ${JSON.stringify(newBooking, null, 2)}`);
-        return true;
-      }
-    }
 
     try {
       const res = await fetch(`${BACKEND_URL}/api/v1/bookings`, {
@@ -607,8 +513,8 @@ export default function Home() {
           lead_id: leads.find((lead) => lead.company_name.toLowerCase().includes('stark'))?.id ?? null,
           start_date: bookingStartDate,
           end_date: bookingEndDate,
-            billing_cycle: billing_cycle,
-            notes: notes ?? `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
+          billing_cycle: billing_cycle,
+          notes: notes ?? `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
         }),
       });
       const payload = await res.json();
@@ -827,38 +733,25 @@ export default function Home() {
                 ))}
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                {filteredMemberInventory.length === 0 ? (
-                  <div className="lg:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
-                    No available slots match this location filter yet. Switch location or wait for availability to refresh.
+              <div className="card p-5 mt-5 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-900">Interactive Seat Selection</h3>
+                    <p className="text-xs text-slate-500 mt-1">Click any available space on the floor plan to initiate booking</p>
                   </div>
-                ) : filteredMemberInventory.map((seat) => (
-                  <div key={seat.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{seat.name}</p>
-                        <p className="text-xs text-slate-500 mt-1">{formatSeatType(seat.type)} • Capacity {seat.capacity}</p>
-                      </div>
-                      <StatusBadge status={seat.status} />
-                    </div>
-                    <div className="mt-4 flex items-end justify-between gap-4">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-wider text-slate-400">Monthly price</p>
-                        <p className="text-lg font-bold text-slate-900">${seat.monthly_rate.toLocaleString()}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <select value={billingCycleChoice} onChange={(e) => setBillingCycleChoice(e.target.value as 'monthly' | 'daily') } className="input text-xs">
-                          <option value="monthly">Monthly</option>
-                          <option value="daily">Daily</option>
-                        </select>
-                        <button onClick={() => bookRoom(seat.id, 'member', billingCycleChoice)} className="btn-primary !py-2 !px-4 text-xs">
-                          Reserve
-                        </button>
-                        <button onClick={() => setSelectedSpace(seat)} className="btn-ghost !py-2 !px-4 text-xs">Select on map</button>
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-xs text-slate-600"><span className="w-2.5 h-2.5 rounded-full bg-emerald-100 border border-emerald-400"></span> Available</span>
+                    <span className="flex items-center gap-1.5 text-xs text-slate-600"><span className="w-2.5 h-2.5 rounded-full bg-rose-100 border border-rose-400"></span> Booked</span>
                   </div>
-                ))}
+                </div>
+                <div className="bg-slate-50 rounded-xl p-2 border border-slate-100">
+                  <FloorMap inventory={inventory} onSelectSpace={(item) => { 
+                    if (item && item.status !== 'available') return;
+                    setSelectedSpace(item); 
+                    const allowed = getAllowedBillingCycles(item?.type || ''); 
+                    setBillingCycleChoice(allowed[0] ?? 'monthly'); 
+                  }} />
+                </div>
               </div>
 
               {/* Booking modal shown when a space is selected on the map */}
@@ -922,10 +815,42 @@ export default function Home() {
             <div className="space-y-6">
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-slate-800">Live floor map</h3>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Polls every 5s</span>
+                  <h3 className="text-sm font-semibold text-slate-800">Bulk Booking Enquiry</h3>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sales Team</span>
                 </div>
-                <FloorMap inventory={inventory} onSelectSpace={(item) => { setSelectedSpace(item); const allowed = getAllowedBillingCycles(item?.type || ''); setBillingCycleChoice(allowed[0] ?? 'monthly'); }} />
+                <div className="space-y-3 mt-4">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 uppercase">Company Name</label>
+                    <input id="bulkCompany" className="input mt-1" placeholder="Your Company Name" />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-400 uppercase">Requirements / Details</label>
+                    <textarea id="bulkDetails" className="input min-h-[80px] resize-none mt-1" placeholder="E.g., Need 20 hot desks and 1 private suite for next month..." />
+                  </div>
+                  <button onClick={async () => {
+                    const companyName = (document.getElementById('bulkCompany') as HTMLInputElement).value;
+                    const details = (document.getElementById('bulkDetails') as HTMLTextAreaElement).value;
+                    if (!companyName) { addToast("Company Name is required"); return; }
+                    setBookingAction('Submitting bulk enquiry...');
+                    try {
+                      const res = await fetch(`${BACKEND_URL}/api/v1/special_requests`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ branch_id: activeBranchId, company_name: companyName, details: details })
+                      });
+                      if (res.ok) {
+                        setBookingAction('Bulk enquiry submitted successfully! Sales will contact you.');
+                        addToast('Enquiry sent to CRM');
+                        (document.getElementById('bulkCompany') as HTMLInputElement).value = '';
+                        (document.getElementById('bulkDetails') as HTMLTextAreaElement).value = '';
+                      } else {
+                        setBookingAction('Failed to submit enquiry.');
+                      }
+                    } catch (e) {
+                      setBookingAction('Error submitting enquiry.');
+                    }
+                  }} className="btn-primary w-full justify-center">Submit Enquiry</button>
+                </div>
               </div>
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
