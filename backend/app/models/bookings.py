@@ -34,7 +34,7 @@ class BookingCreate(BaseModel):
     """Payload for creating a new booking."""
 
     inventory_item_id: UUID
-    lead_id: UUID
+    lead_id: Optional[UUID] = None
     branch_id: UUID
     start_date: date
     end_date: date
@@ -63,7 +63,7 @@ class BookingOut(BaseModel):
 
     id: UUID
     inventory_item_id: UUID
-    lead_id: UUID
+    lead_id: Optional[UUID] = None
     branch_id: UUID
     start_date: date
     end_date: date

@@ -135,7 +135,7 @@ async def create_booking(
         # ── Step 3: Insert booking ────────────────────────────────────────
         booking_row = {
             "inventory_item_id": str(payload.inventory_item_id),
-            "lead_id": str(payload.lead_id),
+            "lead_id": str(payload.lead_id) if payload.lead_id else None,
             "branch_id": str(payload.branch_id),
             "start_date": payload.start_date.isoformat(),
             "end_date": payload.end_date.isoformat(),

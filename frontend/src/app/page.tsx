@@ -18,6 +18,7 @@ interface MemberPerks { member_id: string; monthly_credits: number; printing_quo
 interface MaintenanceTicket { id: string; branch_id: string; inventory_item_id: string | null; description: string; status: 'open' | 'in_progress' | 'resolved'; }
 interface Visitor { id: string; visitor_name: string; purpose: string; status: string; }
 interface FacilityTask { id: string; task_type: string; description: string; priority: string; status: string; }
+interface BookingRecord { id: string; inventory_item_id: string; lead_id: string | null; branch_id: string; start_date: string; end_date: string; monthly_rate_locked: number; total_value: number; status: string; notes: string | null; created_at?: string; }
 
 type Persona = 'manager' | 'cfo' | 'tenant_admin' | 'member' | 'front_desk' | 'it_admin' | 'vendor';
 
@@ -265,10 +266,21 @@ export default function Home() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
+  const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [perks, setPerks] = useState<MemberPerks | null>(null);
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [tasks, setTasks] = useState<FacilityTask[]>([]);
   const [analytics, setAnalytics] = useState({ global_occupancy_rate: 0, total_portfolio_revenue: 0, branch_metrics: [] as any[] });
+  const [bookingStartDate, setBookingStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [bookingEndDate, setBookingEndDate] = useState(() => {
+    const end = new Date();
+    end.setMonth(end.getMonth() + 1);
+    return end.toISOString().slice(0, 10);
+  });
+  const [bookingAction, setBookingAction] = useState('');
+  const [reportSeatId, setReportSeatId] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportAction, setReportAction] = useState('');
   
   const [terminalLog, setTerminalLog] = useState("System online. Awaiting operations...");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -325,7 +337,7 @@ export default function Home() {
   const fetchState = async () => {
     try {
       const hdrs = (role: string) => ({ 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID });
-      const [invRes, leadRes, ticketRes, perkRes, analyticsRes, visRes, taskRes] = await Promise.allSettled([
+      const [invRes, leadRes, ticketRes, perkRes, analyticsRes, visRes, taskRes, bookingsRes] = await Promise.allSettled([
         fetch(`${BACKEND_URL}/api/v1/inventory?branch_id=${activeBranchId}`),
         fetch(`${BACKEND_URL}/api/v1/leads?branch_id=${activeBranchId}`),
         fetch(`${BACKEND_URL}/api/v1/tickets?branch_id=${activeBranchId}`, { headers: hdrs('manager') }),
@@ -333,6 +345,7 @@ export default function Home() {
         fetch(`${BACKEND_URL}/api/v1/analytics/global`, { headers: hdrs('cfo') }),
         fetch(`${BACKEND_URL}/api/v1/visitors?branch_id=${activeBranchId}`, { headers: hdrs('front_desk') }),
         fetch(`${BACKEND_URL}/api/v1/facility/tasks?branch_id=${activeBranchId}`, { headers: hdrs('vendor') }),
+        fetch(`${BACKEND_URL}/api/v1/bookings?branch_id=${activeBranchId}`),
       ]);
       if (invRes.status === 'fulfilled' && invRes.value.ok) setInventory(await invRes.value.json());
       if (leadRes.status === 'fulfilled' && leadRes.value.ok) setLeads(await leadRes.value.json());
@@ -341,6 +354,7 @@ export default function Home() {
       if (analyticsRes.status === 'fulfilled' && analyticsRes.value.ok) setAnalytics(await analyticsRes.value.json());
       if (visRes.status === 'fulfilled' && visRes.value.ok) setVisitors(await visRes.value.json());
       if (taskRes.status === 'fulfilled' && taskRes.value.ok) setTasks(await taskRes.value.json());
+      if (bookingsRes.status === 'fulfilled' && bookingsRes.value.ok) setBookings(await bookingsRes.value.json());
     } catch (err) { console.error("Fetch error:", err); }
   };
 
@@ -375,6 +389,7 @@ export default function Home() {
     setPerks(null);
     setVisitors([]);
     setTasks([]);
+    setBookings([]);
     setAnalytics({ global_occupancy_rate: 0, total_portfolio_revenue: 0, branch_metrics: [] });
     setTerminalLog('Session locked. Awaiting re-authentication...');
   };
@@ -406,10 +421,65 @@ export default function Home() {
 
   const bookRoom = async (itemId: string, role: string) => {
     setTerminalLog(`Validating booking credits for ${role}...`);
+    setBookingAction('Submitting booking request...');
     try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/bookings`, { method: "POST", headers: { "Content-Type": "application/json", "X-User-Role": role, "X-User-ID": STARK_MEMBER_ID }, body: JSON.stringify({ inventory_item_id: itemId, branch_id: KALYAN_BRANCH_ID, company_name: "Stark Industries", start_time: new Date().toISOString(), end_time: new Date(Date.now() + 2 * 3600000).toISOString() }) });
-      setTerminalLog(res.ok ? `✓ BOOKING CONFIRMED:\n${JSON.stringify(await res.json(), null, 2)}` : `✗ BLOCKED:\n${JSON.stringify(await res.json(), null, 2)}`); fetchState();
-    } catch { setTerminalLog("Booking failed."); }
+      const res = await fetch(`${BACKEND_URL}/api/v1/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID },
+        body: JSON.stringify({
+          inventory_item_id: itemId,
+          branch_id: activeBranchId,
+          lead_id: leads.find((lead) => lead.company_name.toLowerCase().includes('stark'))?.id ?? null,
+          start_date: bookingStartDate,
+          end_date: bookingEndDate,
+          notes: `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
+        }),
+      });
+      const payload = await res.json();
+      if (res.ok) {
+        setBookingAction(`Reserved ${inventory.find((seat) => seat.id === itemId)?.name || 'seat'} successfully.`);
+        setTerminalLog(`✓ BOOKING CONFIRMED:\n${JSON.stringify(payload, null, 2)}`);
+      } else {
+        setBookingAction(`Booking blocked: ${payload?.detail || 'request rejected'}`);
+        setTerminalLog(`✗ BLOCKED:\n${JSON.stringify(payload, null, 2)}`);
+      }
+      fetchState();
+    } catch {
+      setBookingAction('Booking failed.');
+      setTerminalLog('Booking failed.');
+    }
+  };
+
+  const reportIssue = async () => {
+    if (!reportDescription.trim()) {
+      setReportAction('Add a short description before submitting the report.');
+      return;
+    }
+
+    setReportAction('Submitting maintenance report...');
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/tickets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-User-Role': 'member', 'X-User-ID': STARK_MEMBER_ID },
+        body: JSON.stringify({
+          branch_id: activeBranchId,
+          inventory_item_id: reportSeatId || null,
+          description: reportDescription,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+
+      setReportDescription('');
+      setReportSeatId('');
+      setReportAction('Issue reported successfully.');
+      setTerminalLog(`✓ MAINTENANCE REPORTED:\n${JSON.stringify(await res.json(), null, 2)}`);
+      fetchState();
+    } catch (error) {
+      setReportAction(`Report failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
   };
 
   const renderDashboard = () => {
@@ -516,6 +586,43 @@ export default function Home() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Booking window</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Start date</label>
+                      <input type="date" value={bookingStartDate} onChange={(event) => setBookingStartDate(event.target.value)} className="input mt-2" />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">End date</label>
+                      <input type="date" value={bookingEndDate} onChange={(event) => setBookingEndDate(event.target.value)} className="input mt-2" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400 mb-2">Maintenance report</p>
+                  <div className="space-y-3">
+                    <select value={reportSeatId} onChange={(event) => setReportSeatId(event.target.value)} className="input">
+                      <option value="">Select a seat or space</option>
+                      {inventory.map((seat) => (
+                        <option key={seat.id} value={seat.id}>{seat.name} - {formatSeatType(seat.type)}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      value={reportDescription}
+                      onChange={(event) => setReportDescription(event.target.value)}
+                      placeholder="Describe the issue, cleaning request, or service problem"
+                      className="input min-h-[92px] resize-none"
+                    />
+                    <button onClick={reportIssue} className="btn-ghost w-full justify-center border border-slate-200">
+                      Report issue to facility team
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-[11px] uppercase tracking-wider text-slate-400">Active branch</p>
@@ -569,6 +676,13 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+
+              {bookingAction ? (
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">{bookingAction}</div>
+              ) : null}
+              {reportAction ? (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">{reportAction}</div>
+              ) : null}
             </div>
 
             <div className="space-y-6">
@@ -578,6 +692,33 @@ export default function Home() {
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Polls every 5s</span>
                 </div>
                 <FloorMap inventory={inventory} />
+              </div>
+              <div className="card p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-800">Recent bookings</h3>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Live branch feed</span>
+                </div>
+                {bookings.length === 0 ? (
+                  <p className="text-sm text-slate-500">No bookings found for this branch yet.</p>
+                ) : (
+                  <div className="space-y-3 max-h-[280px] overflow-y-auto custom-scroll pr-1">
+                    {bookings.slice(0, 6).map((booking) => {
+                      const seat = inventory.find((item) => item.id === booking.inventory_item_id);
+                      return (
+                        <div key={booking.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900">{seat?.name || 'Booked seat'}</p>
+                              <p className="text-xs text-slate-500 mt-1">{booking.start_date} to {booking.end_date}</p>
+                            </div>
+                            <StatusBadge status={booking.status} />
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">${booking.total_value.toLocaleString()} locked at ${booking.monthly_rate_locked.toLocaleString()}/mo</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="card p-5 flex flex-col">
                 <h3 className="text-sm font-semibold text-slate-800 mb-3">Activity Feed</h3>
