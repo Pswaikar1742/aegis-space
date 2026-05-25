@@ -1,0 +1,11 @@
+# feature/production-svg-ui
+
+This branch tracks interactive SVG floor mapping and visual components.
+
+## Scope
+- Interactive floor map rendering with desk status
+- Metric cards and dashboard visualization
+- Real-time client state management
+
+## Status
+Ready for feature development.
