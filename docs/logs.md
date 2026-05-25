@@ -184,3 +184,13 @@
   - `Member Perks Sieve`: Hardened `POST /api/v1/bookings` to intercept `tenant_admin` meeting room reservations, calculate hours, and deduct `monthly_credits`. Blocking transactions automatically on `INSUFFICIENT_CREDITS` (HTTP 400).
   - `Billing Engine`: Created `POST /api/v1/billing/compile` for automated invoicing. Correlates active lease values with member perk overages (mocked as incidental fees on negative credits) to generate a comprehensive `invoices` database record.
   - `Gatekeeper Dependency`: Built `require_role(allowed_roles)` in `app/core/auth.py` processing `X-User-Role` and `X-User-ID`, globally protecting persona scopes.
+
+### 2026-05-25T15:30 — Unified Persona Switcher Console Integration
+**Branch:** `feature/production-ai`
+
+- **Frontend Refactor:**
+  - Overwrote `frontend/src/app/page.tsx` with a production-grade enterprise application.
+  - Implemented the Unified Persona Switcher Console supporting three distinct workspaces: CFO Yield Dashboard, Branch Manager Portal, and Tenant Admin Portal.
+  - Wired live API endpoints to frontend components (inventory, leads, tickets, analytics, and member perks).
+  - Integrated the ERP Sieve allowing `tenant_admin` to book meeting rooms, intercepting transactions to deduct credits directly from `member_perks` via `POST /api/v1/bookings`.
+  - Added live pipeline progression buttons for managers to transition CRM leads seamlessly.
