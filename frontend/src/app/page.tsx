@@ -24,8 +24,9 @@ type LeadRecord = {
 
 type OrchestrateResponse = Record<string, unknown>;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 const POLL_INTERVAL_MS = 5000;
+const BRANCH_ID = "4a7b9c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d";
 
 const demoBodies = [
   {
@@ -93,8 +94,8 @@ export default function Page() {
     try {
       setRefreshError(null);
       const [inventoryPayload, leadsPayload] = await Promise.all([
-        requestJSON("/api/v1/inventory"),
-        requestJSON("/api/v1/leads"),
+        requestJSON(`/api/v1/inventory?branch_id=${BRANCH_ID}`),
+        requestJSON(`/api/v1/leads?branch_id=${BRANCH_ID}`),
       ]);
 
       setInventory(parseInventory(inventoryPayload));
@@ -148,7 +149,7 @@ export default function Page() {
         },
         body: JSON.stringify({
           email_body: emailBody,
-          branch_id: "kalyan-center",
+          branch_id: BRANCH_ID,
         }),
       });
 
