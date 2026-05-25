@@ -1,0 +1,94 @@
+# AegiSpace — Master Transaction Log
+
+> This log tracks all agent actions across all branches. Each entry documents what was built, design decisions made, and risks identified.
+
+---
+
+## Timeline Summary
+
+| Timestamp | Agent | Branch | Action |
+|-----------|-------|--------|--------|
+| 2026-05-25T11:35 | Antigravity | `feature/core-storage` | Initial skeleton: config, db.py, inventory/bookings endpoints, models |
+| 2026-05-25T11:37 | Copilot | `feature/skeleton-frontend` | Next.js app shell, desk UI, API helper |
+| 2026-05-25T11:40 | Antigravity | `feature/skeleton-backend` | Mock `/orchestrate` endpoint with regex parser |
+| 2026-05-25T11:45 | Copilot | `feature/skeleton-frontend` | Project structure bootstrap, placeholders, git push |
+| 2026-05-25T14:05 | Copilot | `feature/skeleton-frontend` | Supabase connectivity validation (HTTP 200 confirmed) |
+| 2026-05-25T13:46 | Antigravity | `feature/production-ai` | Production AI engine: FastRouter service, 4-stage pipeline, config fix |
+| 2026-05-25T13:58 | Antigravity | `main` | Documentation sync: master status.md, logs.md, README, contracts |
+
+---
+
+## Detailed Entries
+
+### 2026-05-25T11:35 — Antigravity Initial Skeleton Build
+**Branch:** `feature/core-storage` → merged into `feature/skeleton-frontend`
+
+- Extended `contracts.json` with `bookings` table (12 fields)
+- Created `core/config.py` — pydantic-settings with Supabase credentials
+- Created `core/db.py` — lazy singleton Supabase client
+- Created Pydantic models for inventory and bookings
+- Created inventory endpoints (GET list with filters, GET single)
+- Created booking endpoints (POST create with rate locking, PATCH update with auto-release, GET list)
+- Created `main.py` — FastAPI factory with CORS + health check
+- **Design:** Rate locking on booking creation isolates from future price changes
+
+### 2026-05-25T11:37 — Copilot Frontend Skeleton Build
+**Branch:** `feature/skeleton-frontend`
+
+- Created Next.js 14 / React 19 project (package.json, tsconfig)
+- Created desk snapshot UI with available/occupied color coding
+- Created orchestrate trigger button with idle/loading/success/error states
+- Created API helper for `POST /api/v1/nexus/orchestrate`
+
+### 2026-05-25T11:40 — Antigravity Skeletal Orchestration
+**Branch:** `feature/skeleton-backend`
+
+- Created `models/nexus.py` — OrchestrateRequest/Response, Decision/HaltReason enums
+- Created `endpoints/nexus.py` — deterministic mock parser (regex heuristics)
+- Extracts company_name, seats_requested, budget, discount_percent via regex
+- Placeholder guard rejects junk inputs ("ok", "test", etc.)
+- **Design:** `_extract_deal_signals()` function is the single replacement target for LLM
+
+### 2026-05-25T11:45 — Copilot Project Structure Bootstrap
+**Branch:** `feature/skeleton-frontend`
+
+- Created empty placeholders: Dockerfile, deploy.sh, ai_parser.py, FloorMap.tsx, MetricCard.tsx
+- Pushed 36 files to GitHub at commit `2271ee7`
+
+### 2026-05-25T14:05 — Copilot Supabase Connectivity Validation
+**Branch:** `feature/skeleton-frontend`
+
+- Validated TCP connectivity to Supabase DB host on port 5432
+- Confirmed authenticated REST API access (HTTP 200 with service-role key)
+- Identified pydantic-settings `extra_forbidden` error — patched with `extra="ignore"`
+
+### 2026-05-25T13:46 — Antigravity Production AI Engine Build
+**Branch:** `feature/production-ai`
+
+- Merged `feature/skeleton-frontend` to bring in all skeleton code
+- **Created `services/ai_service.py`:**
+  - AsyncOpenAI client → FastRouter gateway
+  - Structured system prompt extracts: company_name, required_capacity, requested_type (hot_desk/dedicated_desk/private_office/meeting_room), budget
+  - `json_object` response format, temperature=0.1
+  - Pydantic validation with field_validator on requested_type
+  - Sentinel detection for no-deal inputs
+- **Overwritten `endpoints/nexus.py`:**
+  - Stage 1: Placeholder guard
+  - Stage 2: `await parse_deal_signals()` via FastRouter
+  - Stage 3: Supabase inventory query (type + capacity + budget filtering)
+  - Stage 4 Happy: allocate inventory → create closed_won lead → create booking
+  - Stage 4 Exception: create workbench_halted lead with specific next_steps
+  - Best-effort rollback on partial write failure
+- **Updated `models/nexus.py`:** New HaltReasons, inventory/lead/booking response fields
+- **Updated `config.py`:** FastRouter settings, `extra="ignore"`, version bump to 1.0.0
+- **Updated `requirements.txt`:** Added `openai>=1.60.0`
+- **Created `.gitignore`:** Prevents `.env` secrets from git tracking
+- Pushed to `origin/feature/production-ai` at commit `f402b4f`
+
+### 2026-05-25T13:58 — Antigravity Documentation Sync
+**Branch:** `main`
+
+- Updated README.md with architecture diagram, branch workflow, quick start
+- Created master `docs/status.md` with cross-branch summary
+- Created master `docs/logs.md` (this file) with full timeline
+- Created master `docs/contracts.json` with complete schemas + endpoints

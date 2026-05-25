@@ -1,0 +1,94 @@
+{
+  "database": {
+    "inventory_items": {
+      "fields": {
+        "id": "UUID (Primary Key)",
+        "branch_id": "UUID (Foreign Key)",
+        "name": "VARCHAR(100)",
+        "type": "VARCHAR(50)",
+        "capacity": "INT",
+        "monthly_rate": "DECIMAL(10, 2)",
+        "status": "VARCHAR(50) [available, allocated, maintenance]"
+      }
+    },
+    "leads": {
+      "fields": {
+        "id": "UUID (Primary Key)",
+        "branch_id": "UUID (Foreign Key)",
+        "company_name": "VARCHAR(100)",
+        "contact_email": "VARCHAR(100)",
+        "status": "VARCHAR(50) [new, closed_won, workbench_halted]",
+        "deal_size": "DECIMAL(10, 2)",
+        "next_steps": "TEXT"
+      }
+    },
+    "bookings": {
+      "fields": {
+        "id": "UUID (Primary Key)",
+        "inventory_item_id": "UUID (Foreign Key -> inventory_items.id)",
+        "lead_id": "UUID (Foreign Key -> leads.id)",
+        "branch_id": "UUID (Foreign Key)",
+        "start_date": "DATE",
+        "end_date": "DATE",
+        "monthly_rate_locked": "DECIMAL(10, 2)",
+        "total_value": "DECIMAL(12, 2)",
+        "status": "VARCHAR(50) [pending, confirmed, cancelled, completed]",
+        "notes": "TEXT",
+        "created_at": "TIMESTAMPTZ (DEFAULT NOW())",
+        "updated_at": "TIMESTAMPTZ (DEFAULT NOW())"
+      }
+    }
+  },
+  "api_endpoints": {
+    "get_inventory": {
+      "path": "/api/v1/inventory",
+      "method": "GET",
+      "params": { "branch_id": "string" },
+      "response": "Array of inventory_items"
+    },
+    "get_inventory_item": {
+      "path": "/api/v1/inventory/{item_id}",
+      "method": "GET",
+      "params": {},
+      "response": "Single inventory_item"
+    },
+    "create_booking": {
+      "path": "/api/v1/bookings",
+      "method": "POST",
+      "body": {
+        "inventory_item_id": "string (UUID)",
+        "lead_id": "string (UUID)",
+        "branch_id": "string (UUID)",
+        "start_date": "string (ISO date)",
+        "end_date": "string (ISO date)",
+        "notes": "string (optional)"
+      },
+      "response": "Created booking record"
+    },
+    "update_booking": {
+      "path": "/api/v1/bookings/{booking_id}",
+      "method": "PATCH",
+      "body": {
+        "status": "string [pending, confirmed, cancelled, completed]",
+        "end_date": "string (ISO date, optional)",
+        "notes": "string (optional)"
+      },
+      "response": "Updated booking record"
+    },
+    "get_bookings": {
+      "path": "/api/v1/bookings",
+      "method": "GET",
+      "params": { "branch_id": "string", "lead_id": "string (optional)" },
+      "response": "Array of bookings"
+    },
+    "orchestrate": {
+      "path": "/api/v1/nexus/orchestrate",
+      "method": "POST",
+      "body": {
+        "email_body": "string",
+        "branch_id": "string"
+      },
+      "response": "OrchestrateResponse (decision, extracted_data, matched_inventory, lead_record, booking_record)"
+    }
+  }
+}
