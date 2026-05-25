@@ -30,6 +30,7 @@ type FloorSpace = {
 
 type FloorMapProps = {
   inventory: InventoryItem[];
+  onSelectSpace?: (item: InventoryItem | null) => void;
 };
 
 type TooltipState = {
@@ -89,7 +90,7 @@ function money(value: number): string {
   }).format(value);
 }
 
-export default function FloorMap({ inventory }: FloorMapProps) {
+export default function FloorMap({ inventory, onSelectSpace }: FloorMapProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState>({
     visible: false,
@@ -155,6 +156,9 @@ export default function FloorMap({ inventory }: FloorMapProps) {
             onMouseMove: (event: React.MouseEvent<SVGElement, MouseEvent>) => showTooltip(event, space, matched),
             onFocus: () => {
               setTooltip((prev) => ({ ...prev, visible: false }));
+            },
+            onClick: () => {
+              if (onSelectSpace) onSelectSpace(matched);
             },
             "data-status": status,
           } as const;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FloorMap } from '../components/FloorMap';
+import FloorMap from '../components/FloorMap';
 
 const KALYAN_BRANCH_ID = "4a7b9c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d";
 const STARK_MEMBER_ID = "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"; // Seeded Tenant Admin
@@ -267,7 +267,7 @@ export default function Home() {
       {activePersona === 'manager' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <FloorMap items={inventory} onSelectSpace={(item) => setSelectedSpaceId(item.id)} />
+            <FloorMap inventory={inventory} onSelectSpace={(item) => setSelectedSpaceId(item?.id || "")} />
 
             {/* CRM Pipeline Controller */}
             <div className="bg-white p-6 border rounded-lg border-slate-200 shadow-sm">
