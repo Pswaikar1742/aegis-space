@@ -20,7 +20,7 @@ router = APIRouter(prefix="/tickets", tags=["Maintenance Tickets (Manager/Member
 async def create_ticket(
     payload: TicketCreate,
     db: Client = Depends(get_supabase_client),
-    user_auth: dict = Depends(require_role(["manager", "member"])),
+    user_auth: dict = Depends(require_role(["manager", "member", "front_desk", "vendor"])),
 ):
     try:
         ticket_row = {
@@ -46,7 +46,7 @@ async def create_ticket(
 async def list_tickets(
     branch_id: str = None,
     db: Client = Depends(get_supabase_client),
-    user_auth: dict = Depends(require_role(["manager", "member"])),
+    user_auth: dict = Depends(require_role(["manager", "member", "front_desk", "vendor", "cfo"])),
 ):
     try:
         query = db.table("maintenance_tickets").select("*")

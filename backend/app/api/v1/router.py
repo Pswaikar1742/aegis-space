@@ -16,6 +16,8 @@ from app.api.v1.endpoints.tickets import router as tickets_router
 from app.api.v1.endpoints.members import router as members_router
 from app.api.v1.endpoints.crm import router as crm_router
 from app.api.v1.endpoints.billing import router as billing_router
+from app.api.v1.endpoints.visitors import router as visitors_router
+from app.api.v1.endpoints.facility import router as facility_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -28,3 +30,6 @@ router.include_router(tickets_router)
 router.include_router(members_router)
 router.include_router(crm_router)
 router.include_router(billing_router)
+router.include_router(visitors_router)
+router.include_router(facility_router)
+
