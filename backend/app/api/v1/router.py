@@ -15,6 +15,10 @@ from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.tickets import router as tickets_router
 from app.api.v1.endpoints.members import router as members_router
 from app.api.v1.endpoints.crm import router as crm_router
+from app.api.v1.endpoints.notifications import router as notifications_router
+from app.api.v1.endpoints.special_requests import router as special_requests_router
+from app.api.v1.endpoints.inventory_demo import router as inventory_demo_router
+from app.api.v1.endpoints.branches import router as branches_router
 from app.api.v1.endpoints.billing import router as billing_router
 from app.api.v1.endpoints.visitors import router as visitors_router
 from app.api.v1.endpoints.facility import router as facility_router
@@ -29,6 +33,10 @@ router.include_router(analytics_router)
 router.include_router(tickets_router)
 router.include_router(members_router)
 router.include_router(crm_router)
+router.include_router(notifications_router)
+router.include_router(special_requests_router)
+router.include_router(inventory_demo_router)
+router.include_router(branches_router)
 router.include_router(billing_router)
 router.include_router(visitors_router)
 router.include_router(facility_router)

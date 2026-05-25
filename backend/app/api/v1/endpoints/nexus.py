@@ -293,6 +293,7 @@ async def orchestrate(
             "start_date": today.isoformat(),
             "end_date": (today + timedelta(days=30)).isoformat(),
             "monthly_rate_locked": monthly_rate,
+            "billing_cycle": "monthly",
             "total_value": total_value,
             "status": "confirmed",
             "notes": (
@@ -306,6 +307,22 @@ async def orchestrate(
             booking_response = db.table("bookings").insert(booking_row).execute()
             booking_data = getattr(booking_response, "data", None)
             booking_record = booking_data[0] if booking_data else booking_row
+            # Create a branch manager notification for the auto-allocation
+            try:
+                notif = {
+                    "branch_id": branch_id,
+                    "user_id": None,
+                    "type": "booking_created",
+                    "payload": {
+                        "booking_id": booking_record.get("id"),
+                        "inventory_item_id": best_item.get("id"),
+                        "lead_id": lead_record.get("id"),
+                        "total_value": booking_record.get("total_value"),
+                    },
+                }
+                db.table("notifications").insert(notif).execute()
+            except Exception:
+                logger.exception("Failed to insert notification for Nexus booking")
         except Exception as booking_exc:
             logger.warning(
                 "STAGE 4 WARN — booking insert skipped: %s", booking_exc

@@ -2,13 +2,24 @@
 
 import { useMemo, useRef, useState } from "react";
 
-type InventoryStatus = "available" | "allocated" | "maintenance" | string;
+export type InventoryStatus = "available" | "allocated" | "maintenance" | string;
 type InventoryItem = { id: string; name: string; type: string; status: InventoryStatus; capacity?: number; monthly_rate?: number; monthlyRate?: number; };
 type FloorSpace = { id: string; label: string; kind: "hot_desk" | "dedicated_desk" | "private_suite" | "conference_room"; shape: "rect" | "circle"; x: number; y: number; width?: number; height?: number; r?: number; capacity: number; monthlyRate: number; };
 type FloorMapProps = { inventory: InventoryItem[]; onSelectSpace?: (item: InventoryItem | null) => void; };
 type TooltipState = { visible: boolean; x: number; y: number; space: FloorSpace | null; matched: InventoryItem | null; };
 
-const SPACES: FloorSpace[] = [
+export const SPACES: FloorSpace[] = [ 
+  { id: "hot_desk_1", label: "HD-01", kind: "hot_desk", shape: "rect", x: 55, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
+  { id: "hot_desk_2", label: "HD-02", kind: "hot_desk", shape: "rect", x: 140, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
+  { id: "hot_desk_3", label: "HD-03", kind: "hot_desk", shape: "rect", x: 225, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
+  { id: "hot_desk_4", label: "HD-04", kind: "hot_desk", shape: "rect", x: 310, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
+  { id: "hot_desk_5", label: "HD-05", kind: "hot_desk", shape: "rect", x: 55, y: 128, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
+  { id: "hot_desk_6", label: "HD-06", kind: "hot_desk", shape: "rect", x: 140, y: 128, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
+  { id: "dedicated_seat_40", label: "DS-40", kind: "dedicated_desk", shape: "rect", x: 490, y: 90, width: 100, height: 56, capacity: 1, monthlyRate: 420 },
+  { id: "suite_203", label: "Suite 203", kind: "private_suite", shape: "rect", x: 445, y: 230, width: 200, height: 110, capacity: 8, monthlyRate: 4200 },
+  { id: "conference_alpha", label: "Conf. Alpha", kind: "conference_room", shape: "rect", x: 55, y: 240, width: 240, height: 110, capacity: 12, monthlyRate: 1800 },
+  { id: "phone_booth_a", label: "Booth A", kind: "conference_room", shape: "circle", x: 350, y: 295, r: 28, capacity: 2, monthlyRate: 520 },
+];
   { id: "hot_desk_1", label: "HD-01", kind: "hot_desk", shape: "rect", x: 55, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
   { id: "hot_desk_2", label: "HD-02", kind: "hot_desk", shape: "rect", x: 140, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
   { id: "hot_desk_3", label: "HD-03", kind: "hot_desk", shape: "rect", x: 225, y: 75, width: 72, height: 38, capacity: 1, monthlyRate: 220 },
@@ -76,7 +87,7 @@ export default function FloorMap({ inventory, onSelectSpace }: FloorMapProps) {
               const b = wrapperRef.current?.getBoundingClientRect();
               if (b) setTooltip({ visible: true, x: e.clientX - b.left + 12, y: e.clientY - b.top - 10, space, matched });
             },
-            onClick: () => onSelectSpace?.(matched),
+            onClick: () => onSelectSpace?.(matched ?? mapSpaceToInventory(space)),
           };
           return (
             <g key={space.id}>

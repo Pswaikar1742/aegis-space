@@ -44,6 +44,16 @@ def _compute_total_value(monthly_rate: float, start: date, end: date) -> float:
     return round(monthly_rate * math.ceil(months), 2)
 
 
+# Allowed billing cycles per inventory item type. Keep conservative defaults.
+_ALLOWED_BILLING_CYCLES: dict[str, set[str]] = {
+    "meeting_room": {"daily"},
+    "hot_desk": {"monthly", "daily"},
+    "dedicated_desk": {"monthly"},
+    "private_suite": {"monthly"},
+    # fallback: allow monthly
+}
+
+
 # ── POST /api/v1/bookings ────────────────────────────────────────────────
 
 
@@ -95,9 +105,24 @@ async def create_booking(
 
         # ── Step 2: Lock rate and compute value ───────────────────────────
         monthly_rate = float(item["monthly_rate"])
-        total_value = _compute_total_value(
-            monthly_rate, payload.start_date, payload.end_date
-        )
+        billing_cycle = (getattr(payload, "billing_cycle", "monthly") or "monthly").lower()
+
+        # Validate billing cycle is supported for this inventory item type
+        item_type = (item.get("type") or "").lower()
+        allowed = _ALLOWED_BILLING_CYCLES.get(item_type, {"monthly"})
+        if billing_cycle not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(f"Billing cycle '{billing_cycle}' not allowed for item type '{item_type}'. "
+                        f"Allowed: {', '.join(sorted(allowed))}"),
+            )
+
+        if billing_cycle == "daily":
+            days = max((payload.end_date - payload.start_date).days, 1)
+            daily_rate = round(monthly_rate / 30.0, 2)
+            total_value = round(daily_rate * days, 2)
+        else:
+            total_value = _compute_total_value(monthly_rate, payload.start_date, payload.end_date)
 
         # ── Step 2.5: Member Perks usage for meeting rooms ─────────────────
         role = user_auth.get("role")
@@ -140,6 +165,7 @@ async def create_booking(
             "start_date": payload.start_date.isoformat(),
             "end_date": payload.end_date.isoformat(),
             "monthly_rate_locked": monthly_rate,
+            "billing_cycle": billing_cycle,
             "total_value": total_value,
             "status": BookingStatus.PENDING.value,
             "notes": payload.notes,
@@ -154,6 +180,26 @@ async def create_booking(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Booking insert returned no data",
             )
+
+        # ── Side-effect: create a branch manager notification (best-effort) ──
+        try:
+            created_booking = insert_response.data[0]
+            notif_row = {
+                "branch_id": str(payload.branch_id),
+                "user_id": str(user_id) if user_id else None,
+                "type": "booking_created",
+                "payload": {
+                    "booking_id": created_booking.get("id"),
+                    "inventory_item_id": str(payload.inventory_item_id),
+                    "lead_id": created_booking.get("lead_id"),
+                    "total_value": created_booking.get("total_value"),
+                    "start_date": created_booking.get("start_date"),
+                    "end_date": created_booking.get("end_date"),
+                },
+            }
+            db.table("notifications").insert(notif_row).execute()
+        except Exception:
+            logger.exception("Failed to create booking notification (non-fatal)")
 
         # ── Step 4: Mark inventory as allocated ───────────────────────────
         db.table("inventory_items").update({"status": "allocated"}).eq(

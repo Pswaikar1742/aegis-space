@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import FloorMap from '../components/FloorMap';
+import FloorMap, { SPACES as DEMO_SPACES, mapSpaceToInventory } from '../components/FloorMap';
 import {
   LayoutDashboard, Users, BarChart3, Building2, Bell, Search,
   DollarSign, TrendingUp, CheckCircle2, Shield, Wrench, CreditCard, Printer,
@@ -10,6 +10,8 @@ import {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 const KALYAN_BRANCH_ID = "4a7b9c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d";
+const BKC_BRANCH_ID = "8b9c1d2e-3f4a-5b6c-7d8e-9f0a1b2c3d4e";
+const HYD_BRANCH_ID = "9c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f";
 const STARK_MEMBER_ID = "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d";
 
 interface InventoryItem { id: string; name: string; type: string; capacity: number; monthly_rate: number; status: 'available' | 'allocated' | 'maintenance'; }
@@ -41,9 +43,8 @@ const SESSION_STORAGE_KEY = 'aegis-space-session';
 const ACTIVE_BRANCH_STORAGE_KEY = 'aegis-space-active-branch';
 const MEMBER_LOCATION_STORAGE_KEY = 'aegis-space-member-location';
 
-const BRANCH_LOCATIONS = [
-  { id: KALYAN_BRANCH_ID, name: 'Kalyan Center', city: 'Mumbai Metropolitan Region', note: 'Live inventory source' },
-] as const;
+// Branch shape used for dynamic loading
+type Branch = { id: string; name: string; city?: string; note?: string };
 
 type MemberLocationFilter = 'all' | 'hot_desk' | 'dedicated_desk' | 'meeting_room' | 'private_suite';
 
@@ -262,6 +263,7 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isBootstrapped, setIsBootstrapped] = useState(false);
   const [activeBranchId, setActiveBranchId] = useState(KALYAN_BRANCH_ID);
+  const [branchList, setBranchList] = useState<Branch[]>([]);
   const [memberLocationFilter, setMemberLocationFilter] = useState<MemberLocationFilter>('all');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -278,12 +280,28 @@ export default function Home() {
     return end.toISOString().slice(0, 10);
   });
   const [bookingAction, setBookingAction] = useState('');
+    const [selectedSpace, setSelectedSpace] = useState<InventoryItem | null>(null);
+    const [billingCycleChoice, setBillingCycleChoice] = useState<'monthly' | 'daily'>('monthly');
+    const [bookingNote, setBookingNote] = useState('');
+    function getAllowedBillingCycles(type: string) {
+      switch ((type || '').toLowerCase()) {
+        case 'meeting_room': return ['daily'] as const;
+        case 'hot_desk': return ['monthly', 'daily'] as const;
+        case 'dedicated_desk': return ['monthly'] as const;
+        case 'private_suite': return ['monthly'] as const;
+        default: return ['monthly'] as const;
+      }
+    }
   const [reportSeatId, setReportSeatId] = useState('');
   const [reportDescription, setReportDescription] = useState('');
   const [reportAction, setReportAction] = useState('');
   
   const [terminalLog, setTerminalLog] = useState("System online. Awaiting operations...");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [openSlots, setOpenSlots] = useState(0);
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string }>>([]);
 
   useEffect(() => {
     const storedSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -303,7 +321,7 @@ export default function Home() {
       }
     }
 
-    if (storedBranch && BRANCH_LOCATIONS.some((branch) => branch.id === storedBranch)) {
+    if (storedBranch) {
       setActiveBranchId(storedBranch);
     }
 
@@ -312,6 +330,19 @@ export default function Home() {
     }
 
     setIsBootstrapped(true);
+    // fetch branches early
+    (async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/v1/branches`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setBranchList(data || []);
+        // set default active branch to BKC if present, else Hyderabad, else first
+        const ids = [BKC_BRANCH_ID, HYD_BRANCH_ID, KALYAN_BRANCH_ID];
+        const pick = ids.map(id => data.find((b: any) => b.id === id)).find(Boolean) || data[0];
+        if (pick) setActiveBranchId(pick.id);
+      } catch (e) { console.error('Failed to fetch branches', e); }
+    })();
   }, []);
 
   useEffect(() => {
@@ -330,7 +361,8 @@ export default function Home() {
     }
 
     fetchState();
-    const i = setInterval(fetchState, 5000);
+    fetchNotifications();
+    const i = setInterval(() => { fetchState(); fetchNotifications(); }, 5000);
     return () => clearInterval(i);
   }, [isAuthenticated, activeBranchId]);
 
@@ -347,15 +379,65 @@ export default function Home() {
         fetch(`${BACKEND_URL}/api/v1/facility/tasks?branch_id=${activeBranchId}`, { headers: hdrs('vendor') }),
         fetch(`${BACKEND_URL}/api/v1/bookings?branch_id=${activeBranchId}`),
       ]);
-      if (invRes.status === 'fulfilled' && invRes.value.ok) setInventory(await invRes.value.json());
-      if (leadRes.status === 'fulfilled' && leadRes.value.ok) setLeads(await leadRes.value.json());
-      if (ticketRes.status === 'fulfilled' && ticketRes.value.ok) setTickets(await ticketRes.value.json());
-      if (perkRes.status === 'fulfilled' && perkRes.value.ok) setPerks(await perkRes.value.json());
-      if (analyticsRes.status === 'fulfilled' && analyticsRes.value.ok) setAnalytics(await analyticsRes.value.json());
-      if (visRes.status === 'fulfilled' && visRes.value.ok) setVisitors(await visRes.value.json());
-      if (taskRes.status === 'fulfilled' && taskRes.value.ok) setTasks(await taskRes.value.json());
-      if (bookingsRes.status === 'fulfilled' && bookingsRes.value.ok) setBookings(await bookingsRes.value.json());
+      // parse responses once to avoid double-consuming bodies
+      const invData = invRes.status === 'fulfilled' && invRes.value.ok ? await invRes.value.json() : [];
+      const leadsData = leadRes.status === 'fulfilled' && leadRes.value.ok ? await leadRes.value.json() : [];
+      const ticketsData = ticketRes.status === 'fulfilled' && ticketRes.value.ok ? await ticketRes.value.json() : [];
+      const perksData = perkRes.status === 'fulfilled' && perkRes.value.ok ? await perkRes.value.json() : null;
+      const analyticsData = analyticsRes.status === 'fulfilled' && analyticsRes.value.ok ? await analyticsRes.value.json() : analytics;
+      const visitorsData = visRes.status === 'fulfilled' && visRes.value.ok ? await visRes.value.json() : [];
+      const tasksData = taskRes.status === 'fulfilled' && taskRes.value.ok ? await taskRes.value.json() : [];
+      const bookingsData = bookingsRes.status === 'fulfilled' && bookingsRes.value.ok ? await bookingsRes.value.json() : [];
+
+      setInventory(invData);
+      setLeads(leadsData);
+      setTickets(ticketsData);
+      setPerks(perksData);
+      setAnalytics(analyticsData);
+      setVisitors(visitorsData);
+      setTasks(tasksData);
+      setBookings(bookingsData);
+
+      // Compute open slots using demo spaces and inventory overlay
+      try {
+        let count = 0;
+        for (const space of DEMO_SPACES) {
+          const match = invData.find((i: any) => (i.name || '').toLowerCase().includes(space.label.toLowerCase().replace(/[^a-z0-9]+/g, ' ')));
+          if (match) {
+            if (match.status === 'available') count += 1;
+          } else {
+            // treat demo space as available
+            count += 1;
+          }
+        }
+        setOpenSlots(count);
+      } catch (e) { setOpenSlots(0); }
     } catch (err) { console.error("Fetch error:", err); }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/notifications?branch_id=${activeBranchId}&unread_only=false`, { headers: { 'X-User-Role': 'manager', 'X-User-ID': STARK_MEMBER_ID } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotifications(data || []);
+    } catch (err) { console.error('Notifications fetch failed', err); }
+  };
+
+  const markNotificationRead = async (id: string) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/notifications/${id}`, { method: 'PATCH', headers: { 'X-User-Role': 'manager', 'X-User-ID': STARK_MEMBER_ID } });
+      if (res.ok) {
+        fetchNotifications();
+        fetchState();
+      }
+    } catch (err) { console.error('Mark read failed', err); }
+  };
+
+  const addToast = (message: string) => {
+    const id = `t-${Date.now()}`;
+    setToasts((t) => [{ id, message }, ...t]);
+    setTimeout(() => setToasts((t) => t.filter(x => x.id !== id)), 3500);
   };
 
   const initiateSecureSession = (event: React.FormEvent<HTMLFormElement>) => {
@@ -419,9 +501,95 @@ export default function Home() {
     } catch { setTerminalLog("CRM stage transition failed."); }
   };
 
-  const bookRoom = async (itemId: string, role: string) => {
+  const bookRoom = async (itemId: string, role: string, billing_cycle: string = 'monthly', notes?: string) => {
     setTerminalLog(`Validating booking credits for ${role}...`);
     setBookingAction('Submitting booking request...');
+    // If the itemId isn't present in the backend-fetched inventory, treat as demo/local booking
+    const localMatch = inventory.find(i => i.id === itemId);
+    if (!localMatch) {
+      // Persist demo inventory to backend, then create a booking against it
+      try {
+        const demoSpace = DEMO_SPACES.find(s => s.id === itemId);
+        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', monthly_rate: 220 };
+
+        const createResp = await fetch(`${BACKEND_URL}/api/v1/inventory/demo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID },
+          body: JSON.stringify({
+            branch_id: activeBranchId,
+            external_id: itemId,
+            name: demoItem.name,
+            type: demoItem.type,
+            capacity: demoItem.capacity || 1,
+            monthly_rate: demoItem.monthly_rate || 0,
+          }),
+        });
+
+        if (!createResp.ok) {
+          throw new Error('Failed to create demo inventory');
+        }
+
+        const created = await createResp.json();
+
+        // Now create a booking against the created inventory id
+        const bookingResp = await fetch(`${BACKEND_URL}/api/v1/bookings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID },
+          body: JSON.stringify({
+            inventory_item_id: created.id,
+            branch_id: activeBranchId,
+            lead_id: leads.find((lead) => lead.company_name.toLowerCase().includes('stark'))?.id ?? null,
+            start_date: bookingStartDate,
+            end_date: bookingEndDate,
+            billing_cycle: billing_cycle,
+            notes: notes ?? `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
+          }),
+        });
+
+        const payload = await bookingResp.json();
+        if (bookingResp.ok) {
+          addToast('Booking successful');
+          fetchState();
+          return true;
+        }
+
+        // If booking failed after inventory creation, surface error
+        setBookingAction(`Booking blocked: ${payload?.detail || 'request rejected'}`);
+        setTerminalLog(`✗ BLOCKED:\n${JSON.stringify(payload, null, 2)}`);
+        return false;
+      } catch (err) {
+        // Fallback to local demo booking if persistence fails
+        console.error('Demo persist failed, falling back to local demo booking', err);
+        const demoSpace = DEMO_SPACES.find(s => s.id === itemId);
+        const demoItem = demoSpace ? mapSpaceToInventory(demoSpace) : { id: itemId, name: itemId, type: 'hot_desk', status: 'available', monthly_rate: 220 };
+        const fakeId = `demo-${Date.now()}`;
+        const newBooking = {
+          id: fakeId,
+          inventory_item_id: demoItem.id,
+          lead_id: null,
+          branch_id: activeBranchId,
+          start_date: bookingStartDate,
+          end_date: bookingEndDate,
+          monthly_rate_locked: demoItem.monthly_rate || 0,
+          total_value: billing_cycle === 'daily' ? Math.round((demoItem.monthly_rate || 0) / 30 * (Math.max((new Date(bookingEndDate).getTime() - new Date(bookingStartDate).getTime()) / (1000*60*60*24), 1))) : (demoItem.monthly_rate || 0),
+          status: 'confirmed',
+          notes: notes ?? `Demo booking by ${PERSONA_CREDENTIALS[persona].label}`,
+          created_at: new Date().toISOString(),
+        } as BookingRecord;
+        setBookings((prev) => [newBooking, ...prev]);
+        setInventory((prev) => {
+          const exists = prev.find(p => p.id === demoItem.id);
+          if (exists) return prev.map(p => p.id === demoItem.id ? { ...p, status: 'allocated' } : p);
+          return [{ id: demoItem.id, name: demoItem.name, type: demoItem.type, status: 'allocated', capacity: demoItem.capacity, monthly_rate: demoItem.monthly_rate }, ...prev];
+        });
+        setOpenSlots((s) => Math.max(0, s - 1));
+        addToast('Booking successful (demo)');
+        setBookingAction(`Demo reserved ${demoItem.name} successfully.`);
+        setTerminalLog(`✓ DEMO BOOKING: ${JSON.stringify(newBooking, null, 2)}`);
+        return true;
+      }
+    }
+
     try {
       const res = await fetch(`${BACKEND_URL}/api/v1/bookings`, {
         method: 'POST',
@@ -432,21 +600,27 @@ export default function Home() {
           lead_id: leads.find((lead) => lead.company_name.toLowerCase().includes('stark'))?.id ?? null,
           start_date: bookingStartDate,
           end_date: bookingEndDate,
-          notes: `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
+            billing_cycle: billing_cycle,
+            notes: notes ?? `Reserved through AegisSpace Central Gateway by ${PERSONA_CREDENTIALS[persona].label}`,
         }),
       });
       const payload = await res.json();
       if (res.ok) {
         setBookingAction(`Reserved ${inventory.find((seat) => seat.id === itemId)?.name || 'seat'} successfully.`);
         setTerminalLog(`✓ BOOKING CONFIRMED:\n${JSON.stringify(payload, null, 2)}`);
+        addToast('Booking successful');
+        fetchState();
+        return true;
       } else {
         setBookingAction(`Booking blocked: ${payload?.detail || 'request rejected'}`);
         setTerminalLog(`✗ BLOCKED:\n${JSON.stringify(payload, null, 2)}`);
+        fetchState();
+        return false;
       }
-      fetchState();
     } catch {
       setBookingAction('Booking failed.');
       setTerminalLog('Booking failed.');
+      return false;
     }
   };
 
@@ -520,7 +694,7 @@ export default function Home() {
           <div className="xl:col-span-2 space-y-6">
             <div className="card overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">Kalyan Center Floor Map</h3></div>
-              <div className="p-4"><FloorMap inventory={inventory} /></div>
+              <div className="p-4"><FloorMap inventory={inventory} onSelectSpace={(item) => { setSelectedSpace(item); const allowed = getAllowedBillingCycles(item?.type || ''); setBillingCycleChoice(allowed[0] ?? 'monthly'); }} /></div>
             </div>
             <div className="card overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100"><h3 className="text-sm font-semibold text-slate-800">CRM Lead Pipeline</h3></div>
@@ -550,10 +724,10 @@ export default function Home() {
               </div>
             </div>
             <div className="card p-5"><h3 className="text-sm font-semibold text-slate-800 mb-4">Book Meeting Room (1 Credit/Hr)</h3>
-              <div className="space-y-3">{inventory.filter(i => i.type === 'meeting_room').map(r => (
+                <div className="space-y-3">{inventory.filter(i => i.type === 'meeting_room').map(r => (
                 <div key={r.id} className="flex justify-between items-center p-3 border rounded border-slate-200">
                   <div><p className="font-semibold text-sm">{r.name}</p><p className="text-xs text-slate-500">Cap: {r.capacity}</p></div>
-                  <button onClick={() => bookRoom(r.id, 'tenant_admin')} className="btn-primary !py-1 !px-3 text-xs">Book</button>
+                  <button onClick={() => bookRoom(r.id, 'tenant_admin', getAllowedBillingCycles(r.type)[0] ?? 'daily')} className="btn-primary !py-1 !px-3 text-xs">Book</button>
                 </div>
               ))}</div>
             </div>
@@ -572,15 +746,11 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-2 min-w-[280px]">
                   <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Branch location</label>
-                  <select
-                    value={activeBranchId}
-                    onChange={(event) => setActiveBranchId(event.target.value)}
-                    className="input"
-                  >
-                    {BRANCH_LOCATIONS.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name} - {branch.city}
-                      </option>
+                  <select value={activeBranchId} onChange={(event) => setActiveBranchId(event.target.value)} className="input">
+                    {branchList.length === 0 ? (
+                      <option value={KALYAN_BRANCH_ID}>Kalyan Center</option>
+                    ) : branchList.map((branch) => (
+                      <option key={branch.id} value={branch.id}>{branch.name} - {branch.city}</option>
                     ))}
                   </select>
                 </div>
@@ -626,7 +796,7 @@ export default function Home() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-[11px] uppercase tracking-wider text-slate-400">Active branch</p>
-                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><MapPin size={14} />{BRANCH_LOCATIONS.find((branch) => branch.id === activeBranchId)?.name}</p>
+                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><MapPin size={14} />{(branchList.find((branch) => branch.id === activeBranchId) || { name: 'Kalyan Center' }).name}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-[11px] uppercase tracking-wider text-slate-400">Location filter</p>
@@ -634,7 +804,7 @@ export default function Home() {
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-[11px] uppercase tracking-wider text-slate-400">Open slots</p>
-                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><CalendarRange size={14} />{filteredMemberInventory.length}</p>
+                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><CalendarRange size={14} />{openSlots}</p>
                 </div>
               </div>
 
@@ -669,13 +839,70 @@ export default function Home() {
                         <p className="text-[11px] uppercase tracking-wider text-slate-400">Monthly price</p>
                         <p className="text-lg font-bold text-slate-900">${seat.monthly_rate.toLocaleString()}</p>
                       </div>
-                      <button onClick={() => bookRoom(seat.id, 'member')} className="btn-primary !py-2 !px-4 text-xs">
-                        Reserve seat
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <select value={billingCycleChoice} onChange={(e) => setBillingCycleChoice(e.target.value as 'monthly' | 'daily') } className="input text-xs">
+                          <option value="monthly">Monthly</option>
+                          <option value="daily">Daily</option>
+                        </select>
+                        <button onClick={() => bookRoom(seat.id, 'member', billingCycleChoice)} className="btn-primary !py-2 !px-4 text-xs">
+                          Reserve
+                        </button>
+                        <button onClick={() => setSelectedSpace(seat)} className="btn-ghost !py-2 !px-4 text-xs">Select on map</button>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Booking modal shown when a space is selected on the map */}
+              {selectedSpace && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black/40" onClick={() => setSelectedSpace(null)} />
+                  <div className="relative w-full max-w-md p-6 bg-white rounded-2xl shadow-2xl">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Book {selectedSpace.name}</p>
+                        <p className="text-xs text-slate-500">{formatSeatType(selectedSpace.type)} • Capacity {selectedSpace.capacity}</p>
+                      </div>
+                      <button onClick={() => setSelectedSpace(null)} className="text-slate-400 hover:text-slate-700">Cancel</button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-400">Booking window</label>
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <input type="date" value={bookingStartDate} onChange={(e) => setBookingStartDate(e.target.value)} className="input" />
+                          <input type="date" value={bookingEndDate} onChange={(e) => setBookingEndDate(e.target.value)} className="input" />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-400">Billing cycle</label>
+                        <select value={billingCycleChoice} onChange={(e) => setBillingCycleChoice(e.target.value as 'monthly' | 'daily')} className="input mt-2">
+                          <option value="monthly">Monthly</option>
+                          <option value="daily">Daily</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-semibold text-slate-400">Notes (optional)</label>
+                        <input value={bookingNote} onChange={(e) => setBookingNote(e.target.value)} placeholder="Add a note for your booking" className="input mt-2" />
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 mt-2">
+                        <button onClick={() => setSelectedSpace(null)} className="btn-ghost">Cancel</button>
+                        <button onClick={async () => {
+                          const ok = await bookRoom(selectedSpace.id, 'member', billingCycleChoice, bookingNote);
+                          if (ok) {
+                            setSelectedSpace(null);
+                            setBookingNote('');
+                          }
+                        }} className="btn-primary">Book Now</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {bookingAction ? (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">{bookingAction}</div>
@@ -691,7 +918,7 @@ export default function Home() {
                   <h3 className="text-sm font-semibold text-slate-800">Live floor map</h3>
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Polls every 5s</span>
                 </div>
-                <FloorMap inventory={inventory} />
+                <FloorMap inventory={inventory} onSelectSpace={(item) => { setSelectedSpace(item); const allowed = getAllowedBillingCycles(item?.type || ''); setBillingCycleChoice(allowed[0] ?? 'monthly'); }} />
               </div>
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-3">
@@ -766,6 +993,12 @@ export default function Home() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      {/* Toast container */}
+      <div className="fixed top-4 right-4 z-60 flex flex-col gap-2">
+        {toasts.map(t => (
+          <div key={t.id} className="bg-emerald-600 text-white px-4 py-2 rounded-lg shadow">{t.message}</div>
+        ))}
+      </div>
       <aside className={`${sidebarOpen ? 'w-[260px]' : 'w-[72px]'} bg-slate-900 flex flex-col shrink-0 transition-all duration-300 border-r border-slate-800`}>
         <div className="p-5 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -807,8 +1040,42 @@ export default function Home() {
               <ShieldCheck size={12} /> Secure Session
             </span>
           </div>
-          <div className="flex items-center gap-3 text-slate-400">
-            <Search size={18} /><Bell size={18} />
+          <div className="flex items-center gap-3 text-slate-400 relative">
+            <Search size={18} />
+            <div className="relative">
+              <button onClick={() => { const open = !notifOpen; setNotifOpen(open); if (open) fetchNotifications(); }} className="relative p-1 rounded hover:bg-slate-100">
+                <Bell size={18} />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold leading-none text-white bg-rose-500 rounded-full">{notifications.filter(n => !n.read).length}</span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-100 z-50">
+                  <div className="p-3 border-b border-slate-100 flex items-center justify-between">
+                    <div className="text-sm font-semibold">Notifications</div>
+                    <div className="text-xs text-slate-400">{notifications.length} total</div>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="p-3 text-sm text-slate-500">No notifications</div>
+                    ) : notifications.map((n) => (
+                      <div key={n.id} className={`p-3 border-b border-slate-100 flex items-start justify-between ${n.read ? 'bg-white' : 'bg-emerald-50'}`}>
+                        <div className="text-sm">
+                          <div className="font-semibold">{n.type.replace(/_/g,' ')}</div>
+                          <div className="text-xs text-slate-500 mt-1">{n.payload?.booking_id ? `Booking ${n.payload.booking_id}` : (n.payload?.lead_id ? `Lead ${n.payload.lead_id}` : '')}</div>
+                          <div className="text-xs text-slate-400 mt-1">{new Date(n.created_at).toLocaleString()}</div>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                          {!n.read && <button onClick={() => markNotificationRead(n.id)} className="text-xs text-emerald-700 font-semibold">Mark read</button>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button onClick={lockSession} className="text-xs font-semibold text-slate-500 hover:text-slate-800">Lock</button>
           </div>
         </header>

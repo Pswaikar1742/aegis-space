@@ -38,6 +38,7 @@ class BookingCreate(BaseModel):
     branch_id: UUID
     start_date: date
     end_date: date
+    billing_cycle: str = Field(default="monthly", description="Billing cycle: 'monthly' or 'daily'")
     notes: Optional[str] = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
@@ -68,6 +69,7 @@ class BookingOut(BaseModel):
     start_date: date
     end_date: date
     monthly_rate_locked: float
+    billing_cycle: str
     total_value: float
     status: BookingStatus
     notes: Optional[str] = None
