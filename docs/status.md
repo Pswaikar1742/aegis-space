@@ -9,7 +9,19 @@
 ## Skeleton Tasks — Antigravity Scope
 
 | # | Task | Status | Notes |
-|---|------|--------|-------|
+|---|------|--------|-------|# Save s# Save skeleton work & create backend production branch
+git checkout feature/skeleton-backend
+git checkout -b feature/production-ai
+
+# Create frontend production branch
+git checkout feature/skeleton-frontend
+git checkout -b feature/production-svg-uikeleton work & create backend production branch
+git checkout feature/skeleton-backend
+git checkout -b feature/production-ai
+
+# Create frontend production branch
+git checkout feature/skeleton-frontend
+git checkout -b feature/production-svg-ui
 | 1 | Review initial database schema in `docs/contracts.json` | ✅ Done | Extended with `bookings` table + CRUD endpoint definitions |
 | 2 | Create `backend/app/core/db.py` — Supabase client init | ✅ Done | Lazy singleton via FastAPI `Depends()` generator |
 | 3 | Create `backend/app/api/v1/endpoints/inventory.py` — fetch inventory | ✅ Done | GET list + GET single, server-side filters |
