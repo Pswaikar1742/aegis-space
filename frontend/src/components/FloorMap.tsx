@@ -1,9 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-
-export type InventoryStatus = "available" | "allocated" | "maintenance" | string;
-type InventoryItem = { id: string; name: string; type: string; status: InventoryStatus; capacity?: number; monthly_rate?: number; monthlyRate?: number; };
+import type { InventoryItem } from "../lib/types";
 type FloorSpace = { id: string; label: string; kind: "hot_desk" | "dedicated_desk" | "private_suite" | "conference_room"; shape: "rect" | "circle"; x: number; y: number; width?: number; height?: number; r?: number; capacity: number; monthlyRate: number; };
 type FloorMapProps = { inventory: InventoryItem[]; onSelectSpace?: (item: InventoryItem | null) => void; };
 type TooltipState = { visible: boolean; x: number; y: number; space: FloorSpace | null; matched: InventoryItem | null; };

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import FloorMap, { SPACES as DEMO_SPACES, mapSpaceToInventory } from '../components/FloorMap';
+import type { InventoryItem, BookingRecord, Branch } from '../lib/types';
 import {
   LayoutDashboard, Users, BarChart3, Building2, Bell, Search,
   DollarSign, TrendingUp, CheckCircle2, Shield, Wrench, CreditCard, Printer,
@@ -14,13 +15,11 @@ const BKC_BRANCH_ID = "8b9c1d2e-3f4a-5b6c-7d8e-9f0a1b2c3d4e";
 const HYD_BRANCH_ID = "9c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f";
 const STARK_MEMBER_ID = "1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d";
 
-interface InventoryItem { id: string; name: string; type: string; capacity: number; monthly_rate: number; status: 'available' | 'allocated' | 'maintenance'; }
 interface Lead { id: string; company_name: string; status: 'new' | 'proposal_sent' | 'closed_won' | 'workbench_halted'; deal_size: number; next_steps: string; }
 interface MemberPerks { member_id: string; monthly_credits: number; printing_quota: number; active_status: boolean; }
 interface MaintenanceTicket { id: string; branch_id: string; inventory_item_id: string | null; description: string; status: 'open' | 'in_progress' | 'resolved'; }
 interface Visitor { id: string; visitor_name: string; purpose: string; status: string; }
 interface FacilityTask { id: string; task_type: string; description: string; priority: string; status: string; }
-interface BookingRecord { id: string; inventory_item_id: string; lead_id: string | null; branch_id: string; start_date: string; end_date: string; monthly_rate_locked: number; total_value: number; status: string; notes: string | null; created_at?: string; }
 
 type Persona = 'manager' | 'cfo' | 'tenant_admin' | 'member' | 'front_desk' | 'it_admin' | 'vendor';
 
