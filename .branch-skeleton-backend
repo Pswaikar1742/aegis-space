@@ -1,0 +1,11 @@
+# feature/skeleton-backend
+
+This branch tracks the skeletal backend infrastructure and API endpoints.
+
+## Scope
+- Core database models and Supabase integration
+- FastAPI routing and endpoint scaffolding
+- Configuration and dependency injection
+
+## Status
+Initial setup ready for integration with other features.
