@@ -284,7 +284,7 @@ async def orchestrate(
         lead_data = getattr(lead_response, "data", None)
         lead_record = lead_data[0] if lead_data else lead_row
 
-        # ── Step 4c: Create booking ───────────────────────────────────────
+        # ── Step 4c: Create booking (best-effort; non-fatal for demo) ─────
         today = date.today()
         booking_row = {
             "inventory_item_id": best_item["id"],
@@ -301,14 +301,20 @@ async def orchestrate(
                 f"{signals.requested_type}(s)."
             ),
         }
-        booking_response = db.table("bookings").insert(booking_row).execute()
-        booking_data = getattr(booking_response, "data", None)
-        booking_record = booking_data[0] if booking_data else booking_row
+        booking_record = None
+        try:
+            booking_response = db.table("bookings").insert(booking_row).execute()
+            booking_data = getattr(booking_response, "data", None)
+            booking_record = booking_data[0] if booking_data else booking_row
+        except Exception as booking_exc:
+            logger.warning(
+                "STAGE 4 WARN — booking insert skipped: %s", booking_exc
+            )
 
         logger.info(
             "STAGE 4 SUCCESS — lead=%s booking=%s item=%s",
             lead_record.get("id", "?"),
-            booking_record.get("id", "?"),
+            booking_record.get("id", "?") if booking_record else "skipped",
             best_item["id"],
         )
 

@@ -1,73 +1,184 @@
-# AegisSpace — Task Status Board
+# AegiSpace — Master Status Board
 
-> **Last updated by:** Antigravity (Storage & Transactional Systems Engineer)  
-> **Timestamp:** 2026-05-25T13:46:00+05:30  
-> **Branch:** `feature/production-ai`
+> **Last updated by:** Copilot (Interactive UI Tracking)  
+> **Timestamp:** 2026-05-25T14:45:00+05:30  
+> **Branch:** `main` (documentation sync)
 
 ---
 
-## Database Schemas (from `docs/contracts.json`)
+## Branch Development Summary
+
+### `feature/skeleton-backend` — Core Infrastructure
+**Agent:** Antigravity | **Commits:** 1 (marker) | **Status:** ✅ Complete
+
+| File | What It Does |
+|------|-------------|
+| `backend/app/core/config.py` | Pydantic-settings config with Supabase + FastRouter credentials |
+| `backend/app/core/db.py` | Lazy singleton Supabase client via `Depends()` generator |
+| `backend/app/models/inventory.py` | Pydantic schemas for inventory items (InventoryItemOut, InventoryStatus) |
+| `backend/app/models/bookings.py` | Pydantic schemas for bookings (BookingCreate/Update/Out, date validation) |
+| `backend/app/models/nexus.py` | Pydantic schemas for orchestrate pipeline (request/response/enums) |
+| `backend/app/api/v1/endpoints/inventory.py` | `GET /api/v1/inventory` + `GET /api/v1/inventory/{id}` |
+| `backend/app/api/v1/endpoints/bookings.py` | `POST /api/v1/bookings` + `PATCH /api/v1/bookings/{id}` + `GET /api/v1/bookings` |
+| `backend/app/api/v1/endpoints/nexus.py` | `POST /api/v1/nexus/orchestrate` (mock regex parser, v0.1.0) |
+| `backend/app/api/v1/router.py` | V1 router aggregator mounting all sub-routers |
+| `backend/app/main.py` | FastAPI factory with CORS, health check, structured logging |
+| `backend/requirements.txt` | FastAPI, Uvicorn, Pydantic v2, Supabase SDK, python-dotenv |
+| `backend/.env.example` | Environment variable documentation template |
+
+---
+
+### `feature/skeleton-frontend` — UI Shell
+**Agent:** Copilot (Frontend Skeleton Engineer) | **Commits:** 4 | **Status:** ✅ Complete
+
+| File | What It Does |
+|------|-------------|
+| `frontend/package.json` | Next.js 14 / React 19 project manifest |
+| `frontend/tsconfig.json` | Strict TypeScript compiler config |
+| `frontend/src/app/layout.tsx` | Root app shell with metadata |
+| `frontend/src/app/page.tsx` | Desk snapshot UI with orchestrate trigger button |
+| `frontend/src/app/globals.css` | Base styling |
+| `frontend/src/lib/api.ts` | Fetch helper for `POST /api/v1/nexus/orchestrate` |
+| `frontend/src/components/FloorMap.tsx` | Placeholder for SVG floor map |
+| `frontend/src/components/MetricCard.tsx` | Placeholder for metric cards |
+| `backend/Dockerfile` | Placeholder |
+| `backend/deploy.sh` | Placeholder |
+| `backend/app/services/ai_parser.py` | Placeholder |
+
+---
+
+### `feature/production-ai` — FastRouter LLM Engine
+**Agent:** Antigravity | **Commits:** 7 (includes skeleton-frontend merge) | **Status:** ✅ Complete
+
+| File | What It Does |
+|------|-------------|
+| `backend/app/services/ai_service.py` | **NEW** — AsyncOpenAI ↔ FastRouter LLM parser with structured system prompt |
+| `backend/app/api/v1/endpoints/nexus.py` | **OVERWRITTEN** — Full 4-stage allocation pipeline (AI → inventory → lead → booking) |
+| `backend/app/models/nexus.py` | **UPDATED** — Extended HaltReasons, added inventory/lead/booking response fields |
+| `backend/app/core/config.py` | **UPDATED** — FastRouter settings + `extra="ignore"` pydantic fix |
+| `backend/requirements.txt` | **UPDATED** — Added `openai>=1.60.0` |
+| `.gitignore` | **NEW** — Prevents `.env` secrets from being committed |
+
+#### Production Pipeline Architecture
+
+```
+POST /api/v1/nexus/orchestrate { email_body, branch_id }
+    │
+    ├─ Stage 1: Placeholder guard (reject "ok", "test", <5 chars)
+    │
+    ├─ Stage 2: FastRouter AI parser → {company, capacity, type, budget}
+    │            Uses AsyncOpenAI → gpt-4o via FastRouter gateway
+    │            json_object format, temperature=0.1
+    │
+    ├─ Stage 3: Supabase inventory search
+    │            WHERE type=requested AND status=available
+    │            Filter: capacity >= required AND monthly_rate <= budget
+    │
+    └─ Stage 4:
+         ├─ MATCH FOUND (Happy Path):
+         │   • UPDATE inventory_items → status='allocated'
+         │   • INSERT leads → status='closed_won'
+         │   • INSERT bookings → status='confirmed'
+         │   • Return: Success + all records
+         │
+         └─ NO MATCH (Exception Path):
+             • INSERT leads → status='workbench_halted'
+             • next_steps = specific halt reason
+             • Return: Halted + reason code
+```
+
+---
+
+### `feature/production-svg-ui` — Interactive Floor Map
+**Agent:** Copilot | **Commits:** 2 (implementation + final UI alignment) | **Status:** ✅ Complete
+
+| File | What It Does |
+|------|-------------|
+| `frontend/src/components/FloorMap.tsx` | Interactive SVG vector floor map with live status classes (available / allocated / maintenance), hover telemetry tooltip |
+| `frontend/src/app/page.tsx` | Dashboard controller with live polling for `/api/v1/inventory` and `/api/v1/leads` every 5 seconds |
+| `frontend/src/app/page.tsx` | Demo Sandbox orchestrations wired to `POST /api/v1/nexus/orchestrate`, JSON telemetry rendered to UI terminal |
+| `frontend/package.json` + `frontend/tsconfig.json` + `frontend/next.config.js` | Frontend package scaffolding restored in branch to support local run |
+| `frontend/src/app/layout.tsx` + `frontend/src/app/globals.css` + Tailwind/PostCSS config | App shell + Tailwind initialization for class-based UI rendering |
+| `status.md` (branch root) | Branch-local protocol status report for implementation traceability |
+| `logs.md` (branch root) | Branch-local protocol execution log |
+
+#### Implementation Snapshot
+
+- Live telemetry fetches inventory and lead records on mount and refreshes every 5 seconds.
+- Metrics are derived from the live data stream, including occupancy and active revenue.
+- The SVG floor map uses vector coordinates for hot desks, dedicated seat #40, private suite 203, and conference room alpha.
+- Space colors are driven by database status, with hover tooltips exposing name, capacity, and monthly rate.
+- Sandbox actions call the live orchestration endpoint and render the raw JSON response in the on-screen console.
+
+---
+
+## Active API Endpoints (across all branches)
+
+| Method | Path | Handler | Pipeline Version |
+|--------|------|---------|-----------------|
+| `GET` | `/health` | `app/main.py` | — |
+| `GET` | `/api/v1/inventory` | `endpoints/inventory.py` | v1 |
+| `GET` | `/api/v1/inventory/{item_id}` | `endpoints/inventory.py` | v1 |
+| `POST` | `/api/v1/bookings` | `endpoints/bookings.py` | v1 |
+| `PATCH` | `/api/v1/bookings/{booking_id}` | `endpoints/bookings.py` | v1 |
+| `GET` | `/api/v1/bookings` | `endpoints/bookings.py` | v1 |
+| `POST` | `/api/v1/nexus/orchestrate` | `endpoints/nexus.py` | v1.0.0-fastrouter |
+
+## Database Schemas
 
 | Table | Key Fields | Status Enum |
 |-------|------------|-------------|
-| `inventory_items` | `id`, `branch_id`, `name`, `type`, `capacity`, `monthly_rate`, `status` | available, allocated, maintenance |
-| `leads` | `id`, `branch_id`, `company_name`, `contact_email`, `status`, `deal_size`, `next_steps` | new, closed_won, workbench_halted |
-| `bookings` | `id`, `inventory_item_id`, `lead_id`, `branch_id`, `start_date`, `end_date`, `monthly_rate_locked`, `total_value`, `status`, `notes`, `created_at`, `updated_at` | pending, confirmed, cancelled, completed |
+| `inventory_items` | id, branch_id, name, type, capacity, monthly_rate, status | available, allocated, maintenance |
+| `leads` | id, branch_id, company_name, contact_email, status, deal_size, next_steps | new, closed_won, workbench_halted |
+| `bookings` | id, inventory_item_id, lead_id, branch_id, start/end_date, monthly_rate_locked, total_value, status, notes | pending, confirmed, cancelled, completed |
 
-## Active API Endpoints
+## Environment Configuration
 
-| Method | Path | Handler | Status | Version |
-|--------|------|---------|--------|---------|
-| `GET` | `/health` | `app/main.py` | ✅ Live | — |
-| `GET` | `/api/v1/inventory` | `endpoints/inventory.py` | ✅ Live | v1 |
-| `GET` | `/api/v1/inventory/{item_id}` | `endpoints/inventory.py` | ✅ Live | v1 |
-| `POST` | `/api/v1/bookings` | `endpoints/bookings.py` | ✅ Live | v1 |
-| `PATCH` | `/api/v1/bookings/{booking_id}` | `endpoints/bookings.py` | ✅ Live | v1 |
-| `GET` | `/api/v1/bookings` | `endpoints/bookings.py` | ✅ Live | v1 |
-| `POST` | `/api/v1/nexus/orchestrate` | `endpoints/nexus.py` | ✅ **Live (production v1.0.0-fastrouter)** | v1.0.0 |
+| Variable | Source | Required |
+|----------|--------|----------|
+| `SUPABASE_URL` | Supabase dashboard | ✅ |
+| `SUPABASE_KEY` | Supabase dashboard (publishable) | Optional |
+| `SUPABASE_SERVICE_KEY` | Supabase dashboard (service-role) | ✅ |
+| `FASTROUTER_API_KEY` | FastRouter dashboard | ✅ |
+| `FASTROUTER_BASE_URL` | FastRouter (default: `https://api.fastrouter.io/v1`) | ✅ |
+| `FASTROUTER_MODEL` | LLM model name (default: `gpt-4o`) | ✅ |
 
-## Skeleton Tasks — Consolidated
-
-| # | Task | Branch | Status | Notes |
-|---|------|--------|--------|-------|
-| 1 | Review initial database schema | `feature/core-storage` | ✅ Done | Extended with `bookings` table |
-| 2 | Create `backend/app/core/db.py` — Supabase client | `feature/core-storage` | ✅ Done | Lazy singleton |
-| 3 | Create `inventory.py` endpoints | `feature/core-storage` | ✅ Done | GET list + GET single |
-| 4 | Create `bookings.py` endpoints | `feature/core-storage` | ✅ Done | POST + PATCH + GET |
-| 5 | Create `nexus.py` — `/orchestrate` mock | `feature/skeleton-backend` | ✅ Done | Deterministic regex heuristic |
-| 6 | **Replace mock with FastRouter AI engine** | `feature/production-ai` | ✅ **Done** | Full allocation pipeline |
-
-## Production AI Files — `feature/production-ai`
-
-| File | Purpose | Status |
-|------|---------|--------|
-| `backend/app/services/ai_service.py` | AsyncOpenAI ↔ FastRouter LLM parser | ✅ **New** |
-| `backend/app/api/v1/endpoints/nexus.py` | Full 4-stage allocation pipeline | ✅ **Overwritten** |
-| `backend/app/models/nexus.py` | Extended schemas with inventory/lead/booking fields | ✅ **Updated** |
-| `backend/app/core/config.py` | FastRouter settings + `extra="ignore"` fix | ✅ **Updated** |
-| `backend/requirements.txt` | Added `openai>=1.60.0` | ✅ **Updated** |
-
-## Frontend Component Registry
-
-| Component | Status | Notes |
-|-----------|--------|-------|
-| `frontend/src/app/layout.tsx` | ✅ Done | Minimal app shell and metadata |
-| `frontend/src/app/page.tsx` | ✅ Done | Desk snapshot + orchestrate trigger |
-| `frontend/src/lib/api.ts` | ✅ Done | Fetch helper for orchestrate endpoint |
-
-## Pending / Blocked
+## Pending / Next Steps
 
 | Item | Owner | Status |
 |------|-------|--------|
-| Supabase table creation (DDL) | Architect / DevOps | ⏳ Awaiting — tables must exist before pipeline can run |
-| End-to-end pipeline test | QA / Antigravity | 🔲 Blocked on DDL |
-| Interactive SVG floor map | Frontend Engineer | 🔲 Not started (feature/production-svg-ui) |
+| Supabase DDL (CREATE TABLE) | Architect / DevOps | ⏳ Awaiting |
+| Seed inventory data | DevOps | ⏳ Blocked on DDL |
+| End-to-end pipeline test | QA / Antigravity | 🔲 Blocked on DDL + seed |
+| Interactive SVG floor map | Frontend Engineer | ✅ Implemented on `feature/production-svg-ui` |
+| Merge feature branches → main | Team Lead | 🔲 After testing |
 
-## Branch Structure
+# AegiSpace Branch Status — feature/production-svg-ui
 
-| Branch | Purpose | Status |
-|--------|---------|--------|
-| `feature/skeleton-backend` | Core DB, Supabase, FastAPI | ✅ Ready |
-| `feature/skeleton-frontend` | Next.js desk UI | ✅ Ready |
-| `feature/production-ai` | **FastRouter LLM + allocation pipeline** | ✅ **Active** |
-| `feature/production-svg-ui` | Interactive floor map | 🔲 Not started |
+> Last updated by: Copilot
+> Timestamp: 2026-05-25
+> Branch: feature/production-svg-ui
+
+## Scope Completion
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Live inventory and leads polling in frontend page | Complete | Page bootstraps from `/api/v1/inventory` + `/api/v1/leads`, refreshes every 5s |
+| Interactive SVG floor map | Complete | Added vector layout for Kalyan Center spaces with status-driven color binding |
+| Demo Sandbox backend orchestration integration | Complete | Buttons now call `POST /api/v1/nexus/orchestrate` and stream JSON to UI console |
+| Protocol docs update | Complete | This status file and root log file created for branch traceability |
+
+## Delivered Files
+
+- `frontend/src/app/page.tsx`
+- `frontend/src/components/FloorMap.tsx`
+- `status.md`
+- `logs.md`
+
+## Runtime Expectations
+
+- Frontend reads API base from `NEXT_PUBLIC_API_BASE_URL` (fallback: same origin)
+- Poll interval is fixed at 5000ms
+- Floor map status colors:
+  - available -> light green fill with dark green stroke
+  - allocated -> light red fill with dark red stroke

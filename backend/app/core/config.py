@@ -32,7 +32,13 @@ class Settings(BaseSettings):
     PORT: int = 8080
 
     # ── CORS ──────────────────────────────────────────────────────────────
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002",
+        "http://localhost:3003",
+        "http://localhost:3004",
+    ]
 
     # Crucial: ignore extra keys in .env that aren't modeled here
     model_config = SettingsConfigDict(

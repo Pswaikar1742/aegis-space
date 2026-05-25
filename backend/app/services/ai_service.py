@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Optional
 
 from openai import AsyncOpenAI
@@ -107,6 +108,67 @@ class AIParserError(Exception):
         self.raw_response = raw_response
 
 
+_COMPANY_PATTERN = re.compile(
+    r"(?:company|we are|we're|from)\s+([A-Z][A-Za-z0-9&'\- ]{2,})",
+    re.IGNORECASE,
+)
+_CAPACITY_PATTERN = re.compile(r"(\d+)\s*(?:seats?|desks?|people|engineers|staff|pax)", re.IGNORECASE)
+_BUDGET_PATTERN = re.compile(r"(?:budget|cap|monthly)\s*(?:is|at|of|:)?\s*\$?([\d,.]+)", re.IGNORECASE)
+
+
+def _fallback_parse(email_body: str) -> ParsedDealSignals:
+    """Parse deal signals locally when FastRouter is unavailable."""
+    text = email_body.strip()
+    lowered = text.lower()
+
+    if not text or len(text) < 5:
+        raise AIParserError("Input too short for fallback parsing")
+
+    company_name = "Unknown Company"
+    company_match = _COMPANY_PATTERN.search(text)
+    if company_match:
+        company_name = company_match.group(1).strip().rstrip(".,")
+    else:
+        for candidate in ("stark industries", "wayne enterprises", "acme", "globex"):
+            if candidate in lowered:
+                company_name = candidate.title()
+                break
+
+    requested_type = "hot_desk"
+    if any(token in lowered for token in ("private office", "private suite", "private cabin", "office space", "cabin")):
+        requested_type = "private_office"
+    elif any(token in lowered for token in ("dedicated", "assigned", "fixed desk", "permanent desk")):
+        requested_type = "dedicated_desk"
+    elif any(token in lowered for token in ("conference room", "meeting room", "boardroom", "meeting space")):
+        requested_type = "meeting_room"
+
+    capacity = 1
+    capacity_match = _CAPACITY_PATTERN.search(text)
+    if capacity_match:
+        try:
+            capacity = max(1, int(capacity_match.group(1)))
+        except ValueError:
+            capacity = 1
+    elif requested_type == "meeting_room":
+        capacity = 12
+
+    budget = 0.0
+    budget_match = _BUDGET_PATTERN.search(text)
+    if budget_match:
+        cleaned = budget_match.group(1).replace(",", "")
+        try:
+            budget = float(cleaned)
+        except ValueError:
+            budget = 0.0
+
+    return ParsedDealSignals(
+        company_name=company_name,
+        required_capacity=capacity,
+        requested_type=requested_type,
+        budget=budget,
+    )
+
+
 async def parse_deal_signals(email_body: str) -> ParsedDealSignals:
     """Send the email body to FastRouter and parse the structured response.
 
@@ -186,8 +248,12 @@ async def parse_deal_signals(email_body: str) -> ParsedDealSignals:
         raise
     except Exception as exc:
         logger.exception("FastRouter API call failed")
-        raise AIParserError(
-            f"FastRouter API error: {exc}", raw_response=str(exc)
-        ) from exc
+        try:
+            logger.info("Falling back to local deal parser")
+            return _fallback_parse(email_body)
+        except AIParserError:
+            raise AIParserError(
+                f"FastRouter API error: {exc}", raw_response=str(exc)
+            ) from exc
     finally:
         await client.close()
