@@ -90,7 +90,15 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 ---
 
 ### `feature/production-svg-ui` — Interactive Floor Map
-**Agent:** TBD | **Commits:** 1 (marker) | **Status:** 🔲 Not started
+**Agent:** Copilot | **Commits:** 1 (implementation) | **Status:** ✅ Complete
+
+| File | What It Does |
+|------|-------------|
+| `frontend/src/app/page.tsx` | Pulls live inventory/leads on mount and polls every 5 seconds, computes metric cards |
+| `frontend/src/components/FloorMap.tsx` | Production SVG floor map with vector spaces for hot desks, dedicated seat #40, suite 203, conference alpha |
+| `frontend/src/app/page.tsx` | Demo Sandbox orchestration buttons wired to `POST /api/v1/nexus/orchestrate`, response JSON rendered in UI console |
+| `status.md` (branch root) | Branch-local protocol status report for implementation traceability |
+| `logs.md` (branch root) | Branch-local protocol execution log |
 
 ---
 
