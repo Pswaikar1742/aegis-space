@@ -1,8 +1,8 @@
 # AegisSpace — Task Status Board
 
-> **Last updated by:** Copilot (Frontend Skeleton Engineer)  
-> **Timestamp:** 2026-05-25T11:37:52+05:30  
-> **Branch:** `feature/skeleton-frontend`
+> **Last updated by:** Copilot (Workspace Bootstrap Engineer)  
+> **Timestamp:** 2026-05-25T11:45:00+05:30  
+> **Branch:** `feature/skeleton-frontend` (pushed to GitHub — commit `2271ee7`)
 
 ---
 
@@ -33,7 +33,7 @@
 |------|-------|--------|
 | Supabase table creation (DDL) | Architect / DevOps | ⏳ Awaiting — tables must exist before API can be tested |
 | `POST /api/v1/nexus/orchestrate` | AI/LLM Agent (not Antigravity scope) | 🔲 Not started |
-| Frontend integration | Frontend Engineer | 🔲 Not started |
+| Frontend integration | Frontend Engineer | ✅ Done — Skeleton UI deployed on `feature/skeleton-frontend`, pushed to GitHub |
 
 ## Frontend Component Registry
 
