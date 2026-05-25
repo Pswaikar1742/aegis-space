@@ -1,7 +1,7 @@
 # AegiSpace — Master Status Board
 
-> **Last updated by:** Antigravity (Storage & Transactional Systems Engineer)  
-> **Timestamp:** 2026-05-25T13:58:00+05:30  
+> **Last updated by:** Copilot (Interactive UI Tracking)  
+> **Timestamp:** 2026-05-25T14:45:00+05:30  
 > **Branch:** `main` (documentation sync)
 
 ---
@@ -90,13 +90,15 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 ---
 
 ### `feature/production-svg-ui` — Interactive Floor Map
-**Agent:** Copilot | **Commits:** 1 (implementation) | **Status:** ✅ Complete
+**Agent:** Copilot | **Commits:** 2 (implementation + final UI alignment) | **Status:** ✅ Complete
 
 | File | What It Does |
 |------|-------------|
-| `frontend/src/app/page.tsx` | Pulls live inventory/leads on mount and polls every 5 seconds, computes metric cards |
-| `frontend/src/components/FloorMap.tsx` | Production SVG floor map with vector spaces for hot desks, dedicated seat #40, suite 203, conference alpha |
-| `frontend/src/app/page.tsx` | Demo Sandbox orchestration buttons wired to `POST /api/v1/nexus/orchestrate`, response JSON rendered in UI console |
+| `frontend/src/components/FloorMap.tsx` | Interactive SVG vector floor map with live status classes (available / allocated / maintenance), hover telemetry tooltip |
+| `frontend/src/app/page.tsx` | Dashboard controller with live polling for `/api/v1/inventory` and `/api/v1/leads` every 5 seconds |
+| `frontend/src/app/page.tsx` | Demo Sandbox orchestrations wired to `POST /api/v1/nexus/orchestrate`, JSON telemetry rendered to UI terminal |
+| `frontend/package.json` + `frontend/tsconfig.json` + `frontend/next.config.js` | Frontend package scaffolding restored in branch to support local run |
+| `frontend/src/app/layout.tsx` + `frontend/src/app/globals.css` + Tailwind/PostCSS config | App shell + Tailwind initialization for class-based UI rendering |
 | `status.md` (branch root) | Branch-local protocol status report for implementation traceability |
 | `logs.md` (branch root) | Branch-local protocol execution log |
 
@@ -140,5 +142,5 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | Supabase DDL (CREATE TABLE) | Architect / DevOps | ⏳ Awaiting |
 | Seed inventory data | DevOps | ⏳ Blocked on DDL |
 | End-to-end pipeline test | QA / Antigravity | 🔲 Blocked on DDL + seed |
-| Interactive SVG floor map | Frontend Engineer | 🔲 feature/production-svg-ui |
+| Interactive SVG floor map | Frontend Engineer | ✅ Implemented on `feature/production-svg-ui` |
 | Merge feature branches → main | Team Lead | 🔲 After testing |
