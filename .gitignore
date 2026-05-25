@@ -1,5 +1,7 @@
 # Environment secrets
 backend/.env
+frontend/.env.local
+frontend/.env.production.local
 
 # Python
 __pycache__/
@@ -21,3 +23,6 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Vercel
+.vercel/

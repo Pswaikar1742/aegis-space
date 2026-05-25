@@ -32,12 +32,15 @@ class Settings(BaseSettings):
     PORT: int = 8080
 
     # ── CORS ──────────────────────────────────────────────────────────────
+    # Local dev + Vercel production / preview deployments
     ALLOWED_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3002",
         "http://localhost:3003",
         "http://localhost:3004",
+        "https://aegispace.vercel.app",
+        "https://*.vercel.app",
     ]
 
     # Crucial: ignore extra keys in .env that aren't modeled here

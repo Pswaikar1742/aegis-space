@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# AegiSpace — Render Blueprint (Infrastructure as Code)
+# Deploy via: Render Dashboard → New → Blueprint → Connect this repo
+# Docs: https://render.com/docs/blueprint-spec
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  - type: web
+    name: aegispace-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    repo: https://github.com/YOUR_GITHUB_USERNAME/aegis-space  # ← Update this
+    branch: main
+    region: oregon
+    plan: free                # free | starter | standard
+    healthCheckPath: /health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false           # Set manually in Render dashboard
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: FASTROUTER_API_KEY
+        sync: false
+      - key: FASTROUTER_BASE_URL
+        value: https://api.fastrouter.io/v1
+      - key: FASTROUTER_MODEL
+        value: gpt-4o
+      - key: ALLOWED_ORIGINS
+        sync: false           # Set to your Vercel domain, e.g. ["https://aegispace.vercel.app"]
+      - key: PORT
+        value: "8080"
+      - key: DEBUG
+        value: "false"
