@@ -128,6 +128,8 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | `GET` | `/api/v1/tickets` | `endpoints/tickets.py` | v1 (Manager/Member) |
 | `GET` | `/api/v1/members/perks/{id}` | `endpoints/members.py` | v1 (Tenant Admin) |
 | `PATCH` | `/api/v1/members/perks/{id}` | `endpoints/members.py` | v1 (Tenant Admin) |
+| `PATCH` | `/api/v1/leads/{id}/stage` | `endpoints/crm.py` | v1 (CRM Pipeline) |
+| `POST` | `/api/v1/billing/compile` | `endpoints/billing.py` | v1 (Billing Engine) |
 
 ## Database Schemas
 
@@ -139,6 +141,7 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | `members` | id, company_name, email, role, branch_id | cfo, manager, tenant_admin, member |
 | `member_perks` | member_id, monthly_credits, printing_quota, active_status | - |
 | `maintenance_tickets` | id, branch_id, inventory_item_id, description, status, created_at | open, in_progress, resolved |
+| `invoices` | id, company_name, branch_id, base_rent, incidentals, total_due, status | draft, issued, paid |
 
 ## Environment Configuration
 

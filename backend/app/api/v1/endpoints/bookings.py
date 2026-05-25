@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase import Client
 
 from app.core.db import get_supabase_client
+from app.core.auth import require_role
 from app.models.bookings import BookingCreate, BookingOut, BookingStatus, BookingUpdate
 
 logger = logging.getLogger(__name__)
@@ -55,6 +56,7 @@ def _compute_total_value(monthly_rate: float, start: date, end: date) -> float:
 async def create_booking(
     payload: BookingCreate,
     db: Client = Depends(get_supabase_client),
+    user_auth: dict = Depends(require_role(["cfo", "manager", "tenant_admin", "member"])),
 ) -> BookingOut:
     """Create a new booking and atomically lock the inventory item's rate.
 
@@ -96,6 +98,39 @@ async def create_booking(
         total_value = _compute_total_value(
             monthly_rate, payload.start_date, payload.end_date
         )
+
+        # ── Step 2.5: Member Perks usage for meeting rooms ─────────────────
+        role = user_auth.get("role")
+        user_id = user_auth.get("user_id")
+        
+        if role == "tenant_admin" and item["type"] == "meeting_room" and user_id:
+            # Calculate duration in hours (assume 1 day = 24 hours for dates)
+            days = max((payload.end_date - payload.start_date).days, 1)
+            required_credits = days * 24
+            
+            perks_res = db.table("member_perks").select("*").eq("member_id", user_id).execute()
+            perks_data = getattr(perks_res, "data", None)
+            
+            if not perks_data:
+                raise HTTPException(
+                    status_code=400,
+                    detail="INSUFFICIENT_CREDITS"
+                )
+                
+            perk = perks_data[0]
+            current_credits = perk.get("monthly_credits") or 0
+            
+            if current_credits < required_credits:
+                raise HTTPException(
+                    status_code=400,
+                    detail="INSUFFICIENT_CREDITS"
+                )
+            
+            # Deduct credits
+            db.table("member_perks").update({
+                "monthly_credits": current_credits - required_credits
+            }).eq("member_id", user_id).execute()
+
 
         # ── Step 3: Insert booking ────────────────────────────────────────
         booking_row = {

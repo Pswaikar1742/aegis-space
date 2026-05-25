@@ -5,7 +5,7 @@ from typing import List
 
 from app.core.db import get_supabase_client
 from app.models.tickets import TicketCreate, TicketOut
-from app.api.v1.dependencies import require_role
+from app.core.auth import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/tickets", tags=["Maintenance Tickets (Manager/Member
 async def create_ticket(
     payload: TicketCreate,
     db: Client = Depends(get_supabase_client),
-    role: str = Depends(require_role(["manager", "member"])),
+    user_auth: dict = Depends(require_role(["manager", "member"])),
 ):
     try:
         ticket_row = {
@@ -46,7 +46,7 @@ async def create_ticket(
 async def list_tickets(
     branch_id: str = None,
     db: Client = Depends(get_supabase_client),
-    role: str = Depends(require_role(["manager", "member"])),
+    user_auth: dict = Depends(require_role(["manager", "member"])),
 ):
     try:
         query = db.table("maintenance_tickets").select("*")

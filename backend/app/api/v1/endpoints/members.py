@@ -4,7 +4,7 @@ from supabase import Client
 
 from app.core.db import get_supabase_client
 from app.models.members import MemberPerksOut, MemberPerksUpdate
-from app.api.v1.dependencies import require_role
+from app.core.auth import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/members", tags=["Members (Tenant Admin)"])
 async def get_member_perks(
     member_id: str,
     db: Client = Depends(get_supabase_client),
-    role: str = Depends(require_role(["tenant_admin"])),
+    user_auth: dict = Depends(require_role(["tenant_admin"])),
 ):
     try:
         res = db.table("member_perks").select("*").eq("member_id", member_id).execute()
@@ -41,7 +41,7 @@ async def update_member_perks(
     member_id: str,
     payload: MemberPerksUpdate,
     db: Client = Depends(get_supabase_client),
-    role: str = Depends(require_role(["tenant_admin"])),
+    user_auth: dict = Depends(require_role(["tenant_admin"])),
 ):
     try:
         update_data = payload.model_dump(exclude_unset=True)

@@ -5,7 +5,7 @@ from typing import List
 
 from app.core.db import get_supabase_client
 from app.models.analytics import AnalyticsGlobalOut
-from app.api.v1.dependencies import require_role
+from app.core.auth import require_role
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/analytics", tags=["Analytics (CFO)"])
 )
 async def get_global_analytics(
     db: Client = Depends(get_supabase_client),
-    role: str = Depends(require_role(["cfo"])),
+    user_auth: dict = Depends(require_role(["cfo"])),
 ):
     try:
         # Fetch inventory

@@ -65,6 +65,18 @@
         "status": "VARCHAR(50) [open, in_progress, resolved]",
         "created_at": "TIMESTAMPTZ (DEFAULT NOW())"
       }
+    },
+    "invoices": {
+      "fields": {
+        "id": "UUID (Primary Key)",
+        "company_name": "VARCHAR(100)",
+        "branch_id": "UUID (Foreign Key)",
+        "base_rent": "DECIMAL(12, 2)",
+        "incidentals": "DECIMAL(12, 2)",
+        "total_due": "DECIMAL(12, 2)",
+        "status": "VARCHAR(50) [draft, issued, paid]",
+        "created_at": "TIMESTAMPTZ (DEFAULT NOW())"
+      }
     }
   },
   "api_endpoints": {
@@ -150,6 +162,20 @@
       "headers": { "X-User-Role": "tenant_admin" },
       "body": { "monthly_credits": "int (optional)", "printing_quota": "int (optional)", "active_status": "bool (optional)" },
       "response": "MemberPerksOut"
+    },
+    "update_lead_stage": {
+      "path": "/api/v1/leads/{lead_id}/stage",
+      "method": "PATCH",
+      "headers": { "X-User-Role": "manager | cfo" },
+      "body": { "status": "string [new, proposal_sent, closed_won, workbench_halted]" },
+      "response": "LeadStageOut"
+    },
+    "compile_billing": {
+      "path": "/api/v1/billing/compile",
+      "method": "POST",
+      "headers": { "X-User-Role": "manager | cfo" },
+      "body": { "company_name": "string", "branch_id": "string" },
+      "response": "InvoiceOut"
     }
   }
 }

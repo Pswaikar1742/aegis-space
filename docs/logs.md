@@ -175,3 +175,12 @@
 - **Robustness:**
   - Refactored `endpoints/nexus.py` to prevent `NoneType` errors on empty allocations using safe `getattr(..., "data", None)` lookups instead of naked property access.
   - Enforced strict dictionary `.get(key) or 0` defaults for nullable numeric fields across the engine.
+
+### 2026-05-25T15:20 — Antigravity Operational ERP Expansion
+**Branch:** `feature/production-ai`
+
+- **Core Pipeline Refactor:**
+  - `CRM Pipeline Engine`: Added `PATCH /api/v1/leads/{id}/stage`. Supports automated inventory state synchronization (`closed_won` triggers 'allocated', `workbench_halted` releases holds).
+  - `Member Perks Sieve`: Hardened `POST /api/v1/bookings` to intercept `tenant_admin` meeting room reservations, calculate hours, and deduct `monthly_credits`. Blocking transactions automatically on `INSUFFICIENT_CREDITS` (HTTP 400).
+  - `Billing Engine`: Created `POST /api/v1/billing/compile` for automated invoicing. Correlates active lease values with member perk overages (mocked as incidental fees on negative credits) to generate a comprehensive `invoices` database record.
+  - `Gatekeeper Dependency`: Built `require_role(allowed_roles)` in `app/core/auth.py` processing `X-User-Role` and `X-User-ID`, globally protecting persona scopes.
