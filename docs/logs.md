@@ -112,6 +112,12 @@
   - `status.md`
   - `logs.md`
 
+### Resulting UI Behavior
+
+- The main dashboard now behaves as a live operations console instead of a static mock grid.
+- Inventory and lead polling stay in sync with the backend without a manual refresh.
+- The floor map and the simulation console are tied to the same live backend state so the interface can show immediate allocation effects.
+
 ### 2026-05-25T14:45 — Copilot Final Branch Track Record Sync
 **Branch:** `main`
 
@@ -121,3 +127,35 @@
   - Frontend package scaffolding required to run the branch locally (Next.js + Tailwind files)
 - Corrected pending board item for Interactive SVG floor map from pending to completed on `feature/production-svg-ui`.
 - Updated master `docs/logs.md` timeline with this final documentation synchronization event.
+
+
+# AegiSpace Branch Log — feature/production-svg-ui
+
+## 2026-05-25 — Copilot Interactive UI Build
+
+- Created `frontend/src/app/page.tsx` as a client page that:
+  - Fetches `/api/v1/inventory` and `/api/v1/leads` on mount
+  - Polls both endpoints every 5 seconds
+  - Computes total spaces, available count, allocated count, and active leads
+  - Binds demo simulation buttons to `POST /api/v1/nexus/orchestrate`
+  - Renders orchestrate JSON output directly in an on-page console panel
+- Created `frontend/src/components/FloorMap.tsx` with interactive SVG primitives representing:
+  - Hot desks cluster
+  - Dedicated seat #40
+  - Private suite 203
+  - Conference room alpha
+- Implemented status-aware visual state mapping:
+  - `available` -> `#dff8df` fill and `#1e6b2c` stroke
+  - `allocated` -> `#ffd8d8` fill and `#8c1d1d` stroke
+- Added hover tooltip with space metadata fields:
+  - Name
+  - Capacity
+  - Monthly Rate
+- Added branch trace files:
+  - `status.md`
+  - `logs.md`
+
+## Notes
+
+- Current feature branch originally contained only marker files and README.
+- The frontend source tree for this branch was created as part of this implementation.
