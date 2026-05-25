@@ -1,27 +1,15 @@
 # AegisSpace — Task Status Board
 
-> **Last updated by:** Copilot (Workspace Bootstrap Engineer)  
-> **Timestamp:** 2026-05-25T11:45:00+05:30  
-> **Branch:** `feature/skeleton-frontend` (pushed to GitHub — commit `2271ee7`)
+> **Last updated by:** Copilot (Branch Structure Finalization)  
+> **Timestamp:** 2026-05-25T13:30:00+05:30  
+> **Branch:** `feature/skeleton-frontend` (pushed to GitHub — commit `8c14992`)
 
 ---
 
 ## Skeleton Tasks — Antigravity Scope
 
 | # | Task | Status | Notes |
-|---|------|--------|-------|# Save s# Save skeleton work & create backend production branch
-git checkout feature/skeleton-backend
-git checkout -b feature/production-ai
-
-# Create frontend production branch
-git checkout feature/skeleton-frontend
-git checkout -b feature/production-svg-uikeleton work & create backend production branch
-git checkout feature/skeleton-backend
-git checkout -b feature/production-ai
-
-# Create frontend production branch
-git checkout feature/skeleton-frontend
-git checkout -b feature/production-svg-ui
+|---|------|--------|-------|
 | 1 | Review initial database schema in `docs/contracts.json` | ✅ Done | Extended with `bookings` table + CRUD endpoint definitions |
 | 2 | Create `backend/app/core/db.py` — Supabase client init | ✅ Done | Lazy singleton via FastAPI `Depends()` generator |
 | 3 | Create `backend/app/api/v1/endpoints/inventory.py` — fetch inventory | ✅ Done | GET list + GET single, server-side filters |
@@ -75,3 +63,42 @@ git checkout -b feature/production-svg-ui
 | `frontend/src/components/FloorMap.tsx` | ✅ Done | Empty placeholder created for the map component slot |
 | `frontend/src/components/MetricCard.tsx` | ✅ Done | Empty placeholder created for the metric component slot |
 | `frontend/tailwind.config.js` | ✅ Done | Empty placeholder created to match the documented tree |
+
+## Branch Structure — Workflow Integration
+
+All 4 feature branches created and pushed to GitHub origin with unique scope documentation:
+
+| Branch | Purpose | Status | Commits | Remote Track |
+|--------|---------|--------|---------|--------------|
+| `feature/skeleton-backend` | Core DB models, Supabase integration, FastAPI routing | ✅ Ready | 1 (.branch-skeleton-backend) | `origin/feature/skeleton-backend` |
+| `feature/skeleton-frontend` | Next.js 14, React 19, desk visualization, orchestrate trigger | ✅ Ready | 3 (bootstrap + docs) | `origin/feature/skeleton-frontend` |
+| `feature/production-ai` | Gemini API integration, deal signal extraction, LLM orchestration | ✅ Ready | 1 (.branch-production-ai) | `origin/feature/production-ai` |
+| `feature/production-svg-ui` | Interactive floor mapping, metric cards, real-time state management | ✅ Ready | 1 (.branch-production-svg-ui) | `origin/feature/production-svg-ui` |
+
+### Branch Integration Workflow
+
+```
+[ main ] (Stable Production Baseline — commit 7788c0c)
+   │
+   ├──► [ feature/skeleton-backend ] ─────(Ready for PR)─────┐
+   │                                                         │
+   ├──► [ feature/skeleton-frontend ] ───(Ready for PR)─────┼─► [ main ] (Skeletal Loop Live)
+   │                                                         │
+   ├──► [ feature/production-ai ] ──────(Ready for PR)──────┤
+   │                                                         │
+   └──► [ feature/production-svg-ui ] ──(Ready for PR)──────└─► [ main ] (Final Release Live)
+```
+
+**Next Steps:**
+1. **PR Review & Merge Phase 1** — Merge skeleton branches to main for skeletal loop validation
+2. **Feature Development** — Develop production-ai and production-svg-ui in parallel on their branches
+3. **PR Review & Merge Phase 2** — Merge production branches to main for final release
+
+### Branch Marker Files
+
+Each branch includes a scope documentation file at the root:
+
+- `.branch-skeleton-backend` — Backend infrastructure scope
+- `.branch-skeleton-frontend` — Frontend UI scope
+- `.branch-production-ai` — AI orchestration scope
+- `.branch-production-svg-ui` — Interactive UI scope
