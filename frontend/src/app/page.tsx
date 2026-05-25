@@ -578,10 +578,19 @@ export default function Home() {
         } as BookingRecord;
         setBookings((prev) => [newBooking, ...prev]);
         setInventory((prev) => {
-          const exists = prev.find(p => p.id === demoItem.id);
-          if (exists) return prev.map(p => p.id === demoItem.id ? { ...p, status: 'allocated' } : p);
-          return [{ id: demoItem.id, name: demoItem.name, type: demoItem.type, status: 'allocated', capacity: demoItem.capacity, monthly_rate: demoItem.monthly_rate }, ...prev];
-        });
+        const normalized = {
+          id: demoItem.id,
+          name: demoItem.name,
+          type: demoItem.type,
+          status: 'allocated' as const,
+          capacity: (demoItem.capacity ?? 1) as number,
+          monthly_rate: (demoItem.monthly_rate ?? (demoItem as any).monthlyRate ?? 0) as number,
+        } as InventoryItem;
+
+        const exists = prev.find(p => p.id === demoItem.id);
+        if (exists) return prev.map(p => p.id === demoItem.id ? { ...p, status: 'allocated' } : p);
+        return [normalized, ...prev];
+      });
         setOpenSlots((s) => Math.max(0, s - 1));
         addToast('Booking successful (demo)');
         setBookingAction(`Demo reserved ${demoItem.name} successfully.`);
