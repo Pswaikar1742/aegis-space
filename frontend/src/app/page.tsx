@@ -5,7 +5,7 @@ import FloorMap from '../components/FloorMap';
 import {
   LayoutDashboard, Users, BarChart3, Building2, Bell, Search,
   DollarSign, TrendingUp, CheckCircle2, Shield, Wrench, CreditCard, Printer,
-  Zap, Send, Settings, UserCircle, Briefcase, Activity, LockKeyhole, Fingerprint, ShieldCheck, LogOut, Mail
+  Zap, Send, Settings, UserCircle, Briefcase, Activity, LockKeyhole, Fingerprint, ShieldCheck, LogOut, Mail, MapPin, Layers3, CalendarRange
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
@@ -37,6 +37,22 @@ const NAV_ITEMS: { key: Persona; label: string; icon: any; category: string }[] 
 ];
 
 const SESSION_STORAGE_KEY = 'aegis-space-session';
+const ACTIVE_BRANCH_STORAGE_KEY = 'aegis-space-active-branch';
+const MEMBER_LOCATION_STORAGE_KEY = 'aegis-space-member-location';
+
+const BRANCH_LOCATIONS = [
+  { id: KALYAN_BRANCH_ID, name: 'Kalyan Center', city: 'Mumbai Metropolitan Region', note: 'Live inventory source' },
+] as const;
+
+type MemberLocationFilter = 'all' | 'hot_desk' | 'dedicated_desk' | 'meeting_room' | 'private_suite';
+
+const MEMBER_LOCATION_FILTERS: Array<{ value: MemberLocationFilter; label: string; hint: string }> = [
+  { value: 'all', label: 'All locations', hint: 'Every available slot in this branch' },
+  { value: 'hot_desk', label: 'Hot desks', hint: 'Flexible shared desks' },
+  { value: 'dedicated_desk', label: 'Dedicated desks', hint: 'Reserved personal seats' },
+  { value: 'meeting_room', label: 'Meeting rooms', hint: 'Hourly or session booking spaces' },
+  { value: 'private_suite', label: 'Private suites', hint: 'Enclosed team spaces' },
+];
 
 const PERSONA_CREDENTIALS: Record<Persona, { label: string; password: string; access: string }> = {
   cfo: { label: 'CFO Treasury', password: 'AegisSpace2026!CFO', access: 'Executive finance and portfolio reporting' },
@@ -228,6 +244,15 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={map[status] || 'badge-neutral'}>{status.replace(/_/g, ' ')}</span>;
 }
 
+function formatSeatType(type: string) {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+function seatTypeFilterLabel(filter: MemberLocationFilter) {
+  const entry = MEMBER_LOCATION_FILTERS.find((item) => item.value === filter);
+  return entry?.label ?? 'All locations';
+}
+
 export default function Home() {
   const [persona, setPersona] = useState<Persona>('manager');
   const [selectedPersona, setSelectedPersona] = useState<Persona>('manager');
@@ -235,6 +260,8 @@ export default function Home() {
   const [sessionError, setSessionError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isBootstrapped, setIsBootstrapped] = useState(false);
+  const [activeBranchId, setActiveBranchId] = useState(KALYAN_BRANCH_ID);
+  const [memberLocationFilter, setMemberLocationFilter] = useState<MemberLocationFilter>('all');
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tickets, setTickets] = useState<MaintenanceTicket[]>([]);
@@ -248,6 +275,8 @@ export default function Home() {
 
   useEffect(() => {
     const storedSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+    const storedBranch = window.sessionStorage.getItem(ACTIVE_BRANCH_STORAGE_KEY);
+    const storedLocation = window.sessionStorage.getItem(MEMBER_LOCATION_STORAGE_KEY);
 
     if (storedSession) {
       try {
@@ -262,6 +291,14 @@ export default function Home() {
       }
     }
 
+    if (storedBranch && BRANCH_LOCATIONS.some((branch) => branch.id === storedBranch)) {
+      setActiveBranchId(storedBranch);
+    }
+
+    if (storedLocation && MEMBER_LOCATION_FILTERS.some((filter) => filter.value === storedLocation)) {
+      setMemberLocationFilter(storedLocation as MemberLocationFilter);
+    }
+
     setIsBootstrapped(true);
   }, []);
 
@@ -270,23 +307,32 @@ export default function Home() {
       return;
     }
 
-    window.sessionStorage.setItem(
-      SESSION_STORAGE_KEY,
-      JSON.stringify({ persona, authenticatedAt: new Date().toISOString() } satisfies SessionRecord),
-    );
-  }, [isAuthenticated, persona]);
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ persona, authenticatedAt: new Date().toISOString() } satisfies SessionRecord));
+    window.sessionStorage.setItem(ACTIVE_BRANCH_STORAGE_KEY, activeBranchId);
+    window.sessionStorage.setItem(MEMBER_LOCATION_STORAGE_KEY, memberLocationFilter);
+  }, [isAuthenticated, persona, activeBranchId, memberLocationFilter]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    fetchState();
+    const i = setInterval(fetchState, 5000);
+    return () => clearInterval(i);
+  }, [isAuthenticated, activeBranchId]);
 
   const fetchState = async () => {
     try {
       const hdrs = (role: string) => ({ 'X-User-Role': role, 'X-User-ID': STARK_MEMBER_ID });
       const [invRes, leadRes, ticketRes, perkRes, analyticsRes, visRes, taskRes] = await Promise.allSettled([
-        fetch(`${BACKEND_URL}/api/v1/inventory?branch_id=${KALYAN_BRANCH_ID}`),
-        fetch(`${BACKEND_URL}/api/v1/leads?branch_id=${KALYAN_BRANCH_ID}`),
-        fetch(`${BACKEND_URL}/api/v1/tickets?branch_id=${KALYAN_BRANCH_ID}`, { headers: hdrs('manager') }),
+        fetch(`${BACKEND_URL}/api/v1/inventory?branch_id=${activeBranchId}`),
+        fetch(`${BACKEND_URL}/api/v1/leads?branch_id=${activeBranchId}`),
+        fetch(`${BACKEND_URL}/api/v1/tickets?branch_id=${activeBranchId}`, { headers: hdrs('manager') }),
         fetch(`${BACKEND_URL}/api/v1/members/perks/${STARK_MEMBER_ID}`, { headers: hdrs('tenant_admin') }),
         fetch(`${BACKEND_URL}/api/v1/analytics/global`, { headers: hdrs('cfo') }),
-        fetch(`${BACKEND_URL}/api/v1/visitors?branch_id=${KALYAN_BRANCH_ID}`, { headers: hdrs('front_desk') }),
-        fetch(`${BACKEND_URL}/api/v1/facility/tasks?branch_id=${KALYAN_BRANCH_ID}`, { headers: hdrs('vendor') }),
+        fetch(`${BACKEND_URL}/api/v1/visitors?branch_id=${activeBranchId}`, { headers: hdrs('front_desk') }),
+        fetch(`${BACKEND_URL}/api/v1/facility/tasks?branch_id=${activeBranchId}`, { headers: hdrs('vendor') }),
       ]);
       if (invRes.status === 'fulfilled' && invRes.value.ok) setInventory(await invRes.value.json());
       if (leadRes.status === 'fulfilled' && leadRes.value.ok) setLeads(await leadRes.value.json());
@@ -297,16 +343,6 @@ export default function Home() {
       if (taskRes.status === 'fulfilled' && taskRes.value.ok) setTasks(await taskRes.value.json());
     } catch (err) { console.error("Fetch error:", err); }
   };
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      return;
-    }
-
-    fetchState();
-    const i = setInterval(fetchState, 5000);
-    return () => clearInterval(i);
-  }, [isAuthenticated]);
 
   const initiateSecureSession = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -326,9 +362,13 @@ export default function Home() {
 
   const lockSession = () => {
     window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    window.sessionStorage.removeItem(ACTIVE_BRANCH_STORAGE_KEY);
+    window.sessionStorage.removeItem(MEMBER_LOCATION_STORAGE_KEY);
     setIsAuthenticated(false);
     setSessionPassword('');
     setSessionError('');
+    setActiveBranchId(KALYAN_BRANCH_ID);
+    setMemberLocationFilter('all');
     setInventory([]);
     setLeads([]);
     setTickets([]);
@@ -373,6 +413,18 @@ export default function Home() {
   };
 
   const renderDashboard = () => {
+    const filteredMemberInventory = inventory.filter((item) => {
+      if (item.status !== 'available') {
+        return false;
+      }
+
+      if (memberLocationFilter === 'all') {
+        return true;
+      }
+
+      return item.type === memberLocationFilter;
+    });
+
     switch (persona) {
       case 'cfo': return (
         <div className="space-y-6 animate-fade-in">
@@ -440,17 +492,99 @@ export default function Home() {
         </div>
       );
       case 'member': return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-          <div className="card p-5"><h3 className="text-sm font-semibold text-slate-800 mb-4">Member Portal (End User)</h3>
-            <p className="text-sm text-slate-600 mb-4">Book a hot desk or report a facility issue.</p>
-            <div className="space-y-3">{inventory.filter(i => i.type === 'hot_desk').map(r => (
-              <div key={r.id} className="flex justify-between items-center p-3 border rounded border-slate-200">
-                <div><p className="font-semibold text-sm">{r.name}</p><p className="text-xs text-slate-500">${r.monthly_rate}/mo</p></div>
-                <button onClick={() => bookRoom(r.id, 'member')} className="btn-primary !py-1 !px-3 text-xs">Reserve</button>
+        <div className="space-y-6 animate-fade-in">
+          <div className="grid grid-cols-1 xl:grid-cols-[1.18fr_0.82fr] gap-6">
+            <div className="card p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Member Booking Browser</h3>
+                  <p className="text-sm text-slate-500 mt-1">Choose a location category, inspect the available seats, then reserve directly.</p>
+                </div>
+                <div className="flex flex-col gap-2 min-w-[280px]">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Branch location</label>
+                  <select
+                    value={activeBranchId}
+                    onChange={(event) => setActiveBranchId(event.target.value)}
+                    className="input"
+                  >
+                    {BRANCH_LOCATIONS.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name} - {branch.city}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            ))}</div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400">Active branch</p>
+                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><MapPin size={14} />{BRANCH_LOCATIONS.find((branch) => branch.id === activeBranchId)?.name}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400">Location filter</p>
+                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><Layers3 size={14} />{seatTypeFilterLabel(memberLocationFilter)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-slate-400">Open slots</p>
+                  <p className="mt-1 font-semibold text-slate-900 flex items-center gap-2"><CalendarRange size={14} />{filteredMemberInventory.length}</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-5">
+                {MEMBER_LOCATION_FILTERS.map((filter) => (
+                  <button
+                    key={filter.value}
+                    onClick={() => setMemberLocationFilter(filter.value)}
+                    className={memberLocationFilter === filter.value ? 'btn-primary !py-2 !px-3 text-xs' : 'btn-ghost !py-2 !px-3 text-xs'}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {filteredMemberInventory.length === 0 ? (
+                  <div className="lg:col-span-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-sm text-slate-500">
+                    No available slots match this location filter yet. Switch location or wait for availability to refresh.
+                  </div>
+                ) : filteredMemberInventory.map((seat) => (
+                  <div key={seat.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{seat.name}</p>
+                        <p className="text-xs text-slate-500 mt-1">{formatSeatType(seat.type)} • Capacity {seat.capacity}</p>
+                      </div>
+                      <StatusBadge status={seat.status} />
+                    </div>
+                    <div className="mt-4 flex items-end justify-between gap-4">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wider text-slate-400">Monthly price</p>
+                        <p className="text-lg font-bold text-slate-900">${seat.monthly_rate.toLocaleString()}</p>
+                      </div>
+                      <button onClick={() => bookRoom(seat.id, 'member')} className="btn-primary !py-2 !px-4 text-xs">
+                        Reserve seat
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="card p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-slate-800">Live floor map</h3>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Polls every 5s</span>
+                </div>
+                <FloorMap inventory={inventory} />
+              </div>
+              <div className="card p-5 flex flex-col">
+                <h3 className="text-sm font-semibold text-slate-800 mb-3">Activity Feed</h3>
+                <pre className="flex-1 bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs font-mono whitespace-pre-wrap">{terminalLog}</pre>
+              </div>
+            </div>
           </div>
-          <div className="card p-5 flex flex-col"><h3 className="text-sm font-semibold text-slate-800 mb-3">Activity Feed</h3><pre className="flex-1 bg-slate-900 text-emerald-400 p-4 rounded-lg text-xs font-mono whitespace-pre-wrap">{terminalLog}</pre></div>
         </div>
       );
       case 'front_desk': return (
