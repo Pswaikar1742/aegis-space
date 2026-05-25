@@ -37,6 +37,34 @@
         "created_at": "TIMESTAMPTZ (DEFAULT NOW())",
         "updated_at": "TIMESTAMPTZ (DEFAULT NOW())"
       }
+    },
+    "members": {
+      "fields": {
+        "id": "UUID (Primary Key)",
+        "company_name": "VARCHAR(100)",
+        "email": "VARCHAR(100)",
+        "role": "VARCHAR(50) [cfo, manager, tenant_admin, member]",
+        "branch_id": "UUID (Foreign Key)",
+        "created_at": "TIMESTAMPTZ (DEFAULT NOW())"
+      }
+    },
+    "member_perks": {
+      "fields": {
+        "member_id": "UUID (Primary Key / Foreign Key -> members.id)",
+        "monthly_credits": "INT",
+        "printing_quota": "INT",
+        "active_status": "BOOLEAN"
+      }
+    },
+    "maintenance_tickets": {
+      "fields": {
+        "id": "UUID (Primary Key)",
+        "branch_id": "UUID (Foreign Key)",
+        "inventory_item_id": "UUID (Foreign Key, optional)",
+        "description": "TEXT",
+        "status": "VARCHAR(50) [open, in_progress, resolved]",
+        "created_at": "TIMESTAMPTZ (DEFAULT NOW())"
+      }
     }
   },
   "api_endpoints": {
@@ -87,7 +115,41 @@
       "body": {
         "email_body": "string",
         "branch_id": "string"
-      }
+      },
+      "response": "OrchestrateResponse (decision, extracted_data, matched_inventory, lead_record, booking_record)"
+    },
+    "get_analytics_global": {
+      "path": "/api/v1/analytics/global",
+      "method": "GET",
+      "headers": { "X-User-Role": "cfo" },
+      "response": "AnalyticsGlobalOut (total_revenue, global_occupancy_rate, branch_performance)"
+    },
+    "create_ticket": {
+      "path": "/api/v1/tickets",
+      "method": "POST",
+      "headers": { "X-User-Role": "manager | member" },
+      "body": { "branch_id": "string", "inventory_item_id": "string (optional)", "description": "string" },
+      "response": "TicketOut"
+    },
+    "get_tickets": {
+      "path": "/api/v1/tickets",
+      "method": "GET",
+      "headers": { "X-User-Role": "manager | member" },
+      "params": { "branch_id": "string (optional)" },
+      "response": "Array of TicketOut"
+    },
+    "get_member_perks": {
+      "path": "/api/v1/members/perks/{member_id}",
+      "method": "GET",
+      "headers": { "X-User-Role": "tenant_admin" },
+      "response": "MemberPerksOut"
+    },
+    "update_member_perks": {
+      "path": "/api/v1/members/perks/{member_id}",
+      "method": "PATCH",
+      "headers": { "X-User-Role": "tenant_admin" },
+      "body": { "monthly_credits": "int (optional)", "printing_quota": "int (optional)", "active_status": "bool (optional)" },
+      "response": "MemberPerksOut"
     }
   }
 }

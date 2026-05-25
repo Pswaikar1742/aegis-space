@@ -159,7 +159,8 @@ async def orchestrate(
             .eq("status", "available")
         )
         inv_response = query.execute()
-        available_items = inv_response.data or []
+        # Handle cases where inv_response is None or has no data
+        available_items = getattr(inv_response, "data", None) or []
 
         logger.info(
             "STAGE 3 — found %d available '%s' items for branch %s",
@@ -182,12 +183,12 @@ async def orchestrate(
     # ── Filter by capacity and budget ─────────────────────────────────────
     capacity_matches = [
         item for item in available_items
-        if int(item.get("capacity", 0)) >= signals.required_capacity
+        if int(item.get("capacity") or 0) >= signals.required_capacity
     ]
 
     budget_matches = [
         item for item in capacity_matches
-        if float(item.get("monthly_rate", 0)) <= signals.budget
+        if float(item.get("monthly_rate") or 0) <= signals.budget
     ] if signals.budget > 0 else capacity_matches  # budget=0 means no budget constraint
 
     # ── Determine halt reason if no match ─────────────────────────────────
@@ -202,11 +203,11 @@ async def orchestrate(
         halt_detail = (
             f"Found {len(available_items)} available '{signals.requested_type}' items, "
             f"but none with capacity >= {signals.required_capacity}. "
-            f"Max available capacity: {max(int(i.get('capacity', 0)) for i in available_items)}."
+            f"Max available capacity: {max(int(i.get('capacity') or 0) for i in available_items)}."
         )
     elif not budget_matches:
         halt_reason = HaltReason.BUDGET_EXCEEDED
-        lowest_rate = min(float(i.get("monthly_rate", 0)) for i in capacity_matches)
+        lowest_rate = min(float(i.get("monthly_rate") or 0) for i in capacity_matches)
         halt_detail = (
             f"Found {len(capacity_matches)} items with sufficient capacity, "
             f"but none within budget ≤ ₹{signals.budget:.2f}. "
@@ -249,8 +250,8 @@ async def orchestrate(
     # ══════════════════════════════════════════════════════════════════════
 
     # Pick the best match: cheapest rate among budget-fitting items
-    best_item = min(budget_matches, key=lambda i: float(i.get("monthly_rate", 0)))
-    monthly_rate = float(best_item["monthly_rate"])
+    best_item = min(budget_matches, key=lambda i: float(i.get("monthly_rate") or 0))
+    monthly_rate = float(best_item.get("monthly_rate") or 0)
     total_value = _compute_total_value(monthly_rate, months=1)
 
     logger.info(
@@ -280,7 +281,8 @@ async def orchestrate(
             ),
         }
         lead_response = db.table("leads").insert(lead_row).execute()
-        lead_record = lead_response.data[0] if lead_response.data else lead_row
+        lead_data = getattr(lead_response, "data", None)
+        lead_record = lead_data[0] if lead_data else lead_row
 
         # ── Step 4c: Create booking ───────────────────────────────────────
         today = date.today()
@@ -300,9 +302,8 @@ async def orchestrate(
             ),
         }
         booking_response = db.table("bookings").insert(booking_row).execute()
-        booking_record = (
-            booking_response.data[0] if booking_response.data else booking_row
-        )
+        booking_data = getattr(booking_response, "data", None)
+        booking_record = booking_data[0] if booking_data else booking_row
 
         logger.info(
             "STAGE 4 SUCCESS — lead=%s booking=%s item=%s",
@@ -375,7 +376,8 @@ def _try_create_halted_lead(
             "next_steps": reason,
         }
         response = db.table("leads").insert(lead_row).execute()
-        record = response.data[0] if response.data else lead_row
+        response_data = getattr(response, "data", None)
+        record = response_data[0] if response_data else lead_row
         logger.info(
             "Halted lead created: company=%s reason=%s",
             company_name,
