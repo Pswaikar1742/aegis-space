@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, CheckCircle2, Clock3, LayoutDashboard, ShieldCheck } from 'lucide-react';
+import { Bell, CheckCircle2, Clock3, LayoutDashboard, ShieldCheck, Wrench } from 'lucide-react';
 import FloorMap from '../../../components/FloorMap';
 import { StatusBadge } from '../../../components/DashboardComponents';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
 import { getDashboardPath, readAuthSession } from '../../../lib/session';
-import type { InventoryItem, Lead } from '../../../lib/types';
+import type { FacilityTask, InventoryItem, Lead } from '../../../lib/types';
 
 type Notification = {
   id: string;
@@ -34,6 +34,8 @@ export default function ManagerDashboard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
+  const [maintenanceTasks, setMaintenanceTasks] = useState<FacilityTask[]>([]);
+  const [maintenanceView, setMaintenanceView] = useState<'open' | 'all'>('open');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
@@ -55,19 +57,23 @@ export default function ManagerDashboard() {
   }, [router]);
 
   const fetchManagerState = async () => {
-    const [inventoryRes, leadsRes, notificationsRes, attendanceRes] = await Promise.all([
+    const [inventoryRes, leadsRes, notificationsRes, attendanceRes, facilityRes] = await Promise.all([
       fetch(`${BACKEND_URL}/api/v1/inventory?branch_id=${branchId}`),
       fetch(`${BACKEND_URL}/api/v1/leads?branch_id=${branchId}`),
       fetch(`${BACKEND_URL}/api/v1/notifications?branch_id=${branchId}&unread_only=true`, {
         headers: { 'X-User-Role': 'manager', 'X-User-ID': memberId },
       }),
       fetch(`${BACKEND_URL}/api/v1/attendance?branch_id=${branchId}`),
+      fetch(`${BACKEND_URL}/api/v1/facility/tasks?branch_id=${branchId}`, {
+        headers: { 'X-User-Role': 'manager', 'X-User-ID': memberId },
+      }),
     ]);
 
     if (inventoryRes.ok) setInventory(await inventoryRes.json());
     if (leadsRes.ok) setLeads(await leadsRes.json());
     if (notificationsRes.ok) setNotifications(await notificationsRes.json());
     if (attendanceRes.ok) setAttendance(await attendanceRes.json());
+    if (facilityRes.ok) setMaintenanceTasks(await facilityRes.json());
   };
 
   useEffect(() => {
@@ -95,7 +101,7 @@ export default function ManagerDashboard() {
     const handler = (e: Event) => {
       const ev = (e as CustomEvent).detail as any;
       if (!ev || ev.branch_id !== branchId) return;
-      if (['booking_created','booking_cancelled','ticket_created','attendance_punched'].includes(ev.type)) {
+      if (['booking_created','booking_cancelled','ticket_created','attendance_punched','facility_task_created','facility_task_updated'].includes(ev.type)) {
         fetchManagerState().catch(() => setStatusMessage('Live update failed'));
         if (ev.type === 'attendance_punched') setStatusMessage('Employee checked in');
       }
@@ -105,6 +111,10 @@ export default function ManagerDashboard() {
   }, [mounted, branchId, memberId]);
 
   const unreadNotifications = useMemo(() => notifications.filter((item) => !item.read), [notifications]);
+  const openMaintenanceTasks = useMemo(
+    () => maintenanceTasks.filter((task) => task.status !== 'completed'),
+    [maintenanceTasks],
+  );
 
   const updateLeadStage = async (leadId: string, status: string) => {
     setStatusMessage(`Updating lead ${leadId}...`);
@@ -197,6 +207,38 @@ export default function ManagerDashboard() {
           </section>
 
           <aside className="space-y-6">
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-amber-600" />
+                  <h2 className="text-base font-semibold">Maintenance feed</h2>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <button onClick={() => setMaintenanceView('open')} className={`rounded-full px-3 py-1.5 border ${maintenanceView === 'open' ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-200 bg-white text-slate-600'}`}>Open</button>
+                  <button onClick={() => setMaintenanceView('all')} className={`rounded-full px-3 py-1.5 border ${maintenanceView === 'all' ? 'border-slate-300 bg-slate-100 text-slate-800' : 'border-slate-200 bg-white text-slate-600'}`}>All</button>
+                </div>
+              </div>
+              <div className="space-y-3 max-h-[18rem] overflow-y-auto pr-1">
+                {(maintenanceView === 'open' ? openMaintenanceTasks : maintenanceTasks).length === 0 ? (
+                  <p className="text-sm text-slate-500">No maintenance issues right now.</p>
+                ) : (maintenanceView === 'open' ? openMaintenanceTasks : maintenanceTasks).map((task) => (
+                  <div key={task.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-slate-900">{task.task_type.replace(/_/g, ' ')}</p>
+                        <p className="text-xs text-slate-500 mt-1">{task.description}</p>
+                      </div>
+                      <StatusBadge status={task.status} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                      <span className="uppercase tracking-[0.24em]">{task.priority}</span>
+                      <span>Feed item</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <Clock3 className="h-4 w-4 text-cyan-600" />

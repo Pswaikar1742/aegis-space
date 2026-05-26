@@ -66,4 +66,3 @@ async def websocket_endpoint(websocket: WebSocket):
         unsubscribe()
         if redis_task:
             redis_task.cancel()
-*** End Patch

@@ -17,14 +17,17 @@ function toWsUrl(url: string) {
 export default function RealtimeConnector() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<number>(0);
+  const attemptsRef = useRef(0);
+  const disabledRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
     const url = toWsUrl(BACKEND_URL);
 
     const connect = () => {
-      if (!mounted) return;
+      if (!mounted || disabledRef.current) return;
       try {
+        attemptsRef.current += 1;
         const ws = new WebSocket(url);
         wsRef.current = ws;
 
@@ -55,8 +58,13 @@ export default function RealtimeConnector() {
         };
 
         ws.onclose = () => {
+          if (!mounted || disabledRef.current) return;
+          if (attemptsRef.current >= 3) {
+            disabledRef.current = true;
+            window.dispatchEvent(new CustomEvent('aegis:toast', { detail: { message: 'Live sync is temporarily unavailable; dashboards will keep polling.', level: 'error' } }));
+            return;
+          }
           console.warn('Realtime: closed, will reconnect');
-          if (!mounted) return;
           reconnectRef.current = window.setTimeout(connect, 1500);
         };
 
@@ -66,6 +74,10 @@ export default function RealtimeConnector() {
         };
       } catch (err) {
         console.error('Realtime connect failed', err);
+        if (attemptsRef.current >= 3) {
+          disabledRef.current = true;
+          return;
+        }
         reconnectRef.current = window.setTimeout(connect, 2000);
       }
     };

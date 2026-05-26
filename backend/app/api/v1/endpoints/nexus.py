@@ -115,7 +115,7 @@ async def orchestrate(
         logger.warning("STAGE 2 HALT — AI parse failed: %s", e)
 
         # Attempt to create a halted lead for traceability
-        _try_create_halted_lead(
+        await _try_create_halted_lead(
             db=db,
             branch_id=branch_id,
             company_name="Unknown (AI parse failed)",
@@ -227,7 +227,7 @@ async def orchestrate(
             "STAGE 3 HALT — %s: %s", halt_reason.value, halt_detail
         )
 
-        lead_record = _try_create_halted_lead(
+        lead_record = await _try_create_halted_lead(
             db=db,
             branch_id=branch_id,
             company_name=signals.company_name,
@@ -396,7 +396,7 @@ async def orchestrate(
 # ── Helper: Create a halted lead for traceability ─────────────────────────
 
 
-def _try_create_halted_lead(
+async def _try_create_halted_lead(
     db: Client,
     branch_id: str,
     company_name: str,

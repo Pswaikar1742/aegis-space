@@ -67,6 +67,14 @@ async def create_task(
             except Exception:
                 logger.exception("Failed to publish facility_task_create_failed event")
             raise HTTPException(status_code=500, detail="Failed to create task")
+        try:
+            await publish_event({
+                "type": "facility_task_created",
+                "branch_id": row.get("branch_id"),
+                "task": data[0],
+            })
+        except Exception:
+            logger.exception("Failed to publish facility_task_created event")
         return data[0]
     except HTTPException:
         raise
@@ -115,6 +123,14 @@ async def update_task(
         data = getattr(res, "data", None)
         if not data:
             raise HTTPException(status_code=404, detail="Task not found")
+        try:
+            await publish_event({
+                "type": "facility_task_updated",
+                "task_id": task_id,
+                "task": data[0],
+            })
+        except Exception:
+            logger.exception("Failed to publish facility_task_updated event")
         return data[0]
     except HTTPException:
         raise

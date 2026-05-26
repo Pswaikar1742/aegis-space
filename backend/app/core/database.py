@@ -256,6 +256,10 @@ def _seed(conn: sqlite3.Connection):
         "INSERT INTO member_perks (member_id, monthly_credits, printing_quota, active_status) VALUES (?, ?, ?, ?)",
         (STARK_ID, 240, 1000, 1),
     )
+    cur.execute(
+        "INSERT INTO member_perks (member_id, monthly_credits, printing_quota, active_status) VALUES (?, ?, ?, ?)",
+        ("ten-0001", 180, 500, 1),
+    )
 
     # Members / demo auth identities
     cur.executemany(
@@ -265,6 +269,9 @@ def _seed(conn: sqlite3.Connection):
             ("mgr-0001", "Kalyan Center Ops", "manager@aegis.local", "AegisSpace2026!MGR", "manager", KALYAN_ID),
             ("mem-0001", "Stark Industries", "member@aegis.local", "AegisSpace2026!MEM", "member", KALYAN_ID),
             ("ten-0001", "Stark Industries", "tenant-admin@aegis.local", "AegisSpace2026!TEN", "tenant_admin", KALYAN_ID),
+            ("front-0001", "AegiSpace Front Desk", "front-desk@aegis.local", "AegisSpace2026!FRONT", "front_desk", KALYAN_ID),
+            ("it-0001", "AegiSpace IT", "it-admin@aegis.local", "AegisSpace2026!IT", "it_admin", KALYAN_ID),
+            ("vend-0001", "AegiSpace Facilities", "vendor@aegis.local", "AegisSpace2026!VEND", "vendor", KALYAN_ID),
         ],
     )
 
@@ -336,8 +343,34 @@ def _ensure_feature_seed(conn: sqlite3.Connection) -> None:
                 ("mgr-0001", "Kalyan Center Ops", "manager@aegis.local", "AegisSpace2026!MGR", "manager", KALYAN_ID),
                 ("mem-0001", "Stark Industries", "member@aegis.local", "AegisSpace2026!MEM", "member", KALYAN_ID),
                 ("ten-0001", "Stark Industries", "tenant-admin@aegis.local", "AegisSpace2026!TEN", "tenant_admin", KALYAN_ID),
+                ("front-0001", "AegiSpace Front Desk", "front-desk@aegis.local", "AegisSpace2026!FRONT", "front_desk", KALYAN_ID),
+                ("it-0001", "AegiSpace IT", "it-admin@aegis.local", "AegisSpace2026!IT", "it_admin", KALYAN_ID),
+                ("vend-0001", "AegiSpace Facilities", "vendor@aegis.local", "AegisSpace2026!VEND", "vendor", KALYAN_ID),
             ],
         )
+    else:
+        existing_emails = {
+            row[0] for row in cur.execute("SELECT email FROM members").fetchall()
+        }
+        missing_members = [
+            ("front-0001", "AegiSpace Front Desk", "front-desk@aegis.local", "AegisSpace2026!FRONT", "front_desk", KALYAN_ID),
+            ("it-0001", "AegiSpace IT", "it-admin@aegis.local", "AegisSpace2026!IT", "it_admin", KALYAN_ID),
+            ("vend-0001", "AegiSpace Facilities", "vendor@aegis.local", "AegisSpace2026!VEND", "vendor", KALYAN_ID),
+        ]
+        for row in missing_members:
+            if row[2] not in existing_emails:
+                cur.execute(
+                    "INSERT INTO members (id, company_name, email, password, role, branch_id) VALUES (?,?,?,?,?,?)",
+                    row,
+                )
+
+    if _table_exists(cur, "member_perks"):
+        perks_exists = cur.execute("SELECT COUNT(*) as c FROM member_perks WHERE member_id=?", ("ten-0001",)).fetchone()["c"]
+        if perks_exists == 0:
+            cur.execute(
+                "INSERT INTO member_perks (member_id, monthly_credits, printing_quota, active_status) VALUES (?, ?, ?, ?)",
+                ("ten-0001", 180, 500, 1),
+            )
 
     attendance_count = cur.execute("SELECT COUNT(*) as c FROM attendance_logs").fetchone()["c"] if _table_exists(cur, "attendance_logs") else 0
     if attendance_count == 0:

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarRange, MapPin, MessageSquare, ShieldCheck } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import FloorMap from '../../../components/FloorMap';
 import { StatusBadge, formatSeatType } from '../../../components/DashboardComponents';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
@@ -15,6 +16,22 @@ type BookingForm = {
   billing_cycle: 'daily' | 'monthly';
   notes: string;
 };
+
+type Gatepass = {
+  booking_id: string;
+  inventory_item_id: string;
+  item_name: string;
+  branch_id: string;
+  member_id: string;
+  start_date: string;
+  end_date: string;
+  billing_cycle: string;
+  status: string;
+  issued_at: string;
+  payload: string;
+};
+
+const GATEPASS_STORAGE_KEY = 'aegis-space-member-gatepass';
 
 export default function MemberDashboard() {
   const router = useRouter();
@@ -32,6 +49,7 @@ export default function MemberDashboard() {
   const [supportSeatId, setSupportSeatId] = useState('');
   const [supportDescription, setSupportDescription] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [gatepass, setGatepass] = useState<Gatepass | null>(null);
 
   useEffect(() => {
     const session = readAuthSession();
@@ -49,6 +67,16 @@ export default function MemberDashboard() {
     setBranchId(session.branch_id || KALYAN_BRANCH_ID);
     setMounted(true);
   }, [router]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const raw = window.localStorage.getItem(GATEPASS_STORAGE_KEY);
+      if (raw) setGatepass(JSON.parse(raw) as Gatepass);
+    } catch {
+      window.localStorage.removeItem(GATEPASS_STORAGE_KEY);
+    }
+  }, [mounted]);
 
   const fetchInventory = async (targetBranchId: string) => {
     const response = await fetch(`${BACKEND_URL}/api/v1/inventory?branch_id=${targetBranchId}`);
@@ -125,6 +153,24 @@ export default function MemberDashboard() {
     const data = await response.json();
     if (response.ok) {
       setStatusMessage(`Booking confirmed for ${selectedSpace.name}.`);
+      const issuedAt = new Date().toISOString();
+      const gatepassPayload = {
+        booking_id: data?.id || '',
+        inventory_item_id: selectedSpace.id,
+        item_name: selectedSpace.name,
+        branch_id: branchId,
+        member_id: memberId,
+        start_date: bookingForm.start_date,
+        end_date: bookingForm.end_date,
+        billing_cycle: bookingForm.billing_cycle,
+        status: data?.status || 'pending',
+        issued_at: issuedAt,
+      };
+      const gatepassRecord: Gatepass = { ...gatepassPayload, payload: JSON.stringify(gatepassPayload) };
+      setGatepass(gatepassRecord);
+      try {
+        window.localStorage.setItem(GATEPASS_STORAGE_KEY, JSON.stringify(gatepassRecord));
+      } catch {}
       setSelectedSpace(null);
       setBookingForm((current) => ({ ...current, notes: '' }));
       setInventory((current) => current.map((item) => item.id === selectedSpace.id ? { ...item, status: 'allocated' } : item));
@@ -278,6 +324,30 @@ export default function MemberDashboard() {
             </div>
           </aside>
         </div>
+
+        {gatepass ? (
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Gatepass issued</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">Scan this QR at the entrance</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Booking {gatepass.booking_id || 'pending'} for {gatepass.item_name}. This gatepass can be scanned by front desk or security.
+                </p>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 flex flex-col items-center gap-3">
+                <div className="rounded-2xl bg-white p-3 shadow-sm">
+                  <QRCodeSVG value={gatepass.payload} size={156} includeMargin />
+                </div>
+                <div className="text-center text-xs text-slate-500">
+                  <p className="font-semibold text-slate-700">{gatepass.item_name}</p>
+                  <p>{gatepass.start_date} to {gatepass.end_date}</p>
+                  <p className="mt-1">Status: {gatepass.status}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <div className="text-xs text-slate-400 flex items-center gap-2">
           <CalendarRange className="h-3.5 w-3.5" />

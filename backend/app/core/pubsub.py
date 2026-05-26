@@ -42,10 +42,11 @@ async def publish_event(event: dict) -> None:
 def subscribe(callback: Callable[[dict], Any]) -> Callable[[], None]:
     """Register an in-process listener. Returns an unsubscribe callable."""
     _listeners.append(callback)
+
     def unsubscribe():
         try:
             _listeners.remove(callback)
         except Exception:
             pass
+
     return unsubscribe
-*** End Patch
