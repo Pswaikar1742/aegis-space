@@ -98,6 +98,27 @@ CREATE TABLE IF NOT EXISTS maintenance_tickets (
     created_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS members (
+    id TEXT PRIMARY KEY,
+    company_name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS attendance_logs (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    member_id TEXT,
+    member_name TEXT NOT NULL,
+    punch_in_time TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'clocked_in',
+    note TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS member_perks (
     member_id TEXT PRIMARY KEY,
     monthly_credits INTEGER DEFAULT 0,
@@ -166,7 +187,8 @@ def _seed(conn: sqlite3.Connection):
     cur = conn.cursor()
     count = cur.execute("SELECT COUNT(*) as c FROM branches").fetchone()["c"]
     if count > 0:
-        logger.info("Database already seeded (%d branches), skipping.", count)
+        logger.info("Database already seeded (%d branches), ensuring feature tables are populated.", count)
+        _ensure_feature_seed(conn)
         return
 
     logger.info("Seeding database with initial data...")
@@ -234,6 +256,37 @@ def _seed(conn: sqlite3.Connection):
         (STARK_ID, 240, 1000, 1),
     )
 
+    # Members / demo auth identities
+    cur.executemany(
+        "INSERT INTO members (id, company_name, email, password, role, branch_id) VALUES (?,?,?,?,?,?)",
+        [
+            ("cfo-0001", "AegiSpace Finance", "cfo@aegis.local", "AegisSpace2026!CFO", "cfo", KALYAN_ID),
+            ("mgr-0001", "Kalyan Center Ops", "manager@aegis.local", "AegisSpace2026!MGR", "manager", KALYAN_ID),
+            ("mem-0001", "Stark Industries", "member@aegis.local", "AegisSpace2026!MEM", "member", KALYAN_ID),
+            ("ten-0001", "Stark Industries", "tenant-admin@aegis.local", "AegisSpace2026!TEN", "tenant_admin", KALYAN_ID),
+        ],
+    )
+
+    # Attendance logs
+    cur.executemany(
+        "INSERT INTO attendance_logs (id, branch_id, member_id, member_name, punch_in_time, status, note) VALUES (?,?,?,?,?,?,?)",
+        [
+            (str(uuid.uuid4()), KALYAN_ID, "cfo-0001", "Natasha Romanoff", "2026-05-26 08:42:00", "clocked_in", "CFO floor review"),
+            (str(uuid.uuid4()), KALYAN_ID, "mgr-0001", "Happy Hogan", "2026-05-26 09:05:00", "clocked_in", "Morning ops standup"),
+            (str(uuid.uuid4()), KALYAN_ID, "mem-0001", "Tony Stark", "2026-05-26 09:18:00", "clocked_in", "Seat HD-02"),
+        ],
+    )
+
+    # Invoices / accounts receivable seed
+    cur.executemany(
+        "INSERT INTO invoices (id, company_name, branch_id, base_rent, incidentals, total_due, status) VALUES (?,?,?,?,?,?,?)",
+        [
+            (str(uuid.uuid4()), "Stark Industries", KALYAN_ID, 42000, 1200, 43200, "issued"),
+            (str(uuid.uuid4()), "Wayne Enterprises", KALYAN_ID, 15000, 0, 15000, "draft"),
+            (str(uuid.uuid4()), "Oscorp", BKC_ID, 22000, 450, 22450, "issued"),
+        ],
+    )
+
     # Visitors (Front-Desk seed)
     cur.executemany(
         "INSERT INTO visitors (id, branch_id, visitor_name, company, purpose, host_member_id, status) VALUES (?,?,?,?,?,?,?)",
@@ -267,6 +320,55 @@ def _seed(conn: sqlite3.Connection):
 
     conn.commit()
     logger.info("Database seeded successfully with 3 branches and %d inventory items.", len(kalyan_inv) + len(bkc_inv) + len(hyd_inv))
+
+
+def _ensure_feature_seed(conn: sqlite3.Connection) -> None:
+    """Populate newly introduced tables on existing databases without duplicating legacy data."""
+    cur = conn.cursor()
+
+    member_count = cur.execute("SELECT COUNT(*) as c FROM members").fetchone()["c"] if _table_exists(cur, "members") else 0
+    if member_count == 0:
+        cur.executemany(
+            "INSERT INTO members (id, company_name, email, password, role, branch_id) VALUES (?,?,?,?,?,?)",
+            [
+                ("cfo-0001", "AegiSpace Finance", "cfo@aegis.local", "AegisSpace2026!CFO", "cfo", KALYAN_ID),
+                ("mgr-0001", "Kalyan Center Ops", "manager@aegis.local", "AegisSpace2026!MGR", "manager", KALYAN_ID),
+                ("mem-0001", "Stark Industries", "member@aegis.local", "AegisSpace2026!MEM", "member", KALYAN_ID),
+                ("ten-0001", "Stark Industries", "tenant-admin@aegis.local", "AegisSpace2026!TEN", "tenant_admin", KALYAN_ID),
+            ],
+        )
+
+    attendance_count = cur.execute("SELECT COUNT(*) as c FROM attendance_logs").fetchone()["c"] if _table_exists(cur, "attendance_logs") else 0
+    if attendance_count == 0:
+        cur.executemany(
+            "INSERT INTO attendance_logs (id, branch_id, member_id, member_name, punch_in_time, status, note) VALUES (?,?,?,?,?,?,?)",
+            [
+                (str(uuid.uuid4()), KALYAN_ID, "cfo-0001", "Natasha Romanoff", "2026-05-26 08:42:00", "clocked_in", "CFO floor review"),
+                (str(uuid.uuid4()), KALYAN_ID, "mgr-0001", "Happy Hogan", "2026-05-26 09:05:00", "clocked_in", "Morning ops standup"),
+                (str(uuid.uuid4()), KALYAN_ID, "mem-0001", "Tony Stark", "2026-05-26 09:18:00", "clocked_in", "Seat HD-02"),
+            ],
+        )
+
+    invoices_count = cur.execute("SELECT COUNT(*) as c FROM invoices").fetchone()["c"] if _table_exists(cur, "invoices") else 0
+    if invoices_count == 0:
+        cur.executemany(
+            "INSERT INTO invoices (id, company_name, branch_id, base_rent, incidentals, total_due, status) VALUES (?,?,?,?,?,?,?)",
+            [
+                (str(uuid.uuid4()), "Stark Industries", KALYAN_ID, 42000, 1200, 43200, "issued"),
+                (str(uuid.uuid4()), "Wayne Enterprises", KALYAN_ID, 15000, 0, 15000, "draft"),
+                (str(uuid.uuid4()), "Oscorp", BKC_ID, 22000, 450, 22450, "issued"),
+            ],
+        )
+
+    conn.commit()
+
+
+def _table_exists(cur: sqlite3.Cursor, table_name: str) -> bool:
+    row = cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        (table_name,),
+    ).fetchone()
+    return row is not None
 
 
 def init_db():

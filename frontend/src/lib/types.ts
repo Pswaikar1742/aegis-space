@@ -25,3 +25,16 @@ export interface BookingRecord {
 }
 
 export type Branch = { id: string; name: string; city?: string; note?: string };
+
+export interface Lead { id: string; company_name: string; status: 'new' | 'proposal_sent' | 'closed_won' | 'workbench_halted'; deal_size: number; next_steps: string; }
+export interface MemberPerks { member_id: string; monthly_credits: number; printing_quota: number; active_status: boolean; }
+export interface MaintenanceTicket { id: string; branch_id: string; inventory_item_id: string | null; description: string; status: 'open' | 'in_progress' | 'resolved'; }
+export interface Visitor { id: string; visitor_name: string; purpose: string; status: string; }
+export interface FacilityTask { id: string; task_type: string; description: string; priority: string; status: string; }
+
+export type Persona = 'manager' | 'cfo' | 'tenant_admin' | 'member' | 'front_desk' | 'it_admin' | 'vendor';
+
+export type SessionRecord = {
+  persona: Persona;
+  authenticatedAt: string;
+};

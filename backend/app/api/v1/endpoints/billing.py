@@ -10,6 +10,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["Automated Invoicing Engine"])
 
+
+@router.get(
+    "/receivables",
+    response_model=list[InvoiceOut],
+    summary="List open accounts receivable",
+)
+async def list_receivables(
+    branch_id: str | None = None,
+    db: Client = Depends(get_supabase_client),
+    user_auth: dict = Depends(require_role(["cfo", "manager"])),
+) -> list[InvoiceOut]:
+    try:
+        query = db.table("invoices").select("*").neq("status", "paid")
+        if branch_id:
+            query = query.eq("branch_id", branch_id)
+        response = query.order("created_at", desc=True).execute()
+        return [InvoiceOut(**row) for row in (getattr(response, "data", None) or [])]
+    except Exception as exc:
+        logger.exception("Failed to fetch receivables")
+        raise HTTPException(status_code=500, detail=str(exc))
+
 @router.post(
     "/compile",
     response_model=InvoiceOut,

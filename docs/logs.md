@@ -17,6 +17,7 @@
 | 2026-05-25T13:58 | Antigravity | `main` | Documentation sync: master status.md, logs.md, README, contracts |
 | 2026-05-25T14:20 | Copilot | `feature/production-svg-ui` | Interactive SVG UI: live polling dashboard, floor map, demo sandbox orchestration wiring |
 | 2026-05-25T14:45 | Copilot | `main` | Finalized track record sync for feature/production-svg-ui and corrected pending status |
+| 2026-05-26T00:00 | Copilot | `main` | Multi-route UI overhaul: login, member, manager, and CFO routes split into standalone pages; backend auth/attendance/receivables added |
 
 ---
 
@@ -127,6 +128,17 @@
   - Frontend package scaffolding required to run the branch locally (Next.js + Tailwind files)
 - Corrected pending board item for Interactive SVG floor map from pending to completed on `feature/production-svg-ui`.
 - Updated master `docs/logs.md` timeline with this final documentation synchronization event.
+
+### 2026-05-26T00:00 — Copilot Multi-Route UI Overhaul
+**Branch:** `main`
+
+- Added `POST /api/v1/auth/login` backed by the SQLite `members` table so the frontend can authenticate with email/password and route by role.
+- Added `GET /api/v1/attendance` and seeded demo attendance logs for the manager punch-in feed.
+- Added `GET /api/v1/billing/receivables` so the CFO workspace can render accounts receivable from SQLite invoices.
+- Split the frontend into standalone `login`, `member`, `manager`, and `cfo` routes with isolated 5-second polling loops.
+- Removed the shared dashboard shell wrapper from the route layout so each page owns its own spacing and refresh behavior.
+- Replaced the old single-page root route with a redirect to `/login`.
+- Validated the frontend with a successful production build after the route split.
 
 
 # AegiSpace Branch Log — feature/production-svg-ui

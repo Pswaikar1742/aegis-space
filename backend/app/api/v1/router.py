@@ -22,6 +22,8 @@ from app.api.v1.endpoints.branches import router as branches_router
 from app.api.v1.endpoints.billing import router as billing_router
 from app.api.v1.endpoints.visitors import router as visitors_router
 from app.api.v1.endpoints.facility import router as facility_router
+from app.api.v1.endpoints.auth import router as auth_router
+from app.api.v1.endpoints.attendance import router as attendance_router
 from app.api.v1.endpoints import chat
 
 router = APIRouter(prefix="/api/v1")
@@ -41,5 +43,7 @@ router.include_router(branches_router)
 router.include_router(billing_router)
 router.include_router(visitors_router)
 router.include_router(facility_router)
+router.include_router(auth_router)
+router.include_router(attendance_router)
 router.include_router(chat.router, prefix="/chat", tags=["Copilot Chat"])
 

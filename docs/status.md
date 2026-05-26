@@ -1,7 +1,7 @@
 # AegiSpace — Master Status Board
 
-> **Last updated by:** Copilot (Interactive UI Tracking)  
-> **Timestamp:** 2026-05-25T14:45:00+05:30  
+> **Last updated by:** Copilot (Multi-Route UI Overhaul)  
+> **Timestamp:** 2026-05-26T00:00:00+05:30  
 > **Branch:** `main` (documentation sync)
 
 ---
@@ -139,6 +139,7 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | `leads` | id, branch_id, company_name, contact_email, status, deal_size, next_steps | new, closed_won, workbench_halted |
 | `bookings` | id, inventory_item_id, lead_id, branch_id, start/end_date, monthly_rate_locked, total_value, status, notes | pending, confirmed, cancelled, completed |
 | `members` | id, company_name, email, role, branch_id | cfo, manager, tenant_admin, member |
+| `attendance_logs` | id, branch_id, member_id, member_name, punch_in_time, status, note | clocked_in |
 | `member_perks` | member_id, monthly_credits, printing_quota, active_status | - |
 | `maintenance_tickets` | id, branch_id, inventory_item_id, description, status, created_at | open, in_progress, resolved |
 | `invoices` | id, company_name, branch_id, base_rent, incidentals, total_due, status | draft, issued, paid |
@@ -153,6 +154,7 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | `FASTROUTER_API_KEY` | FastRouter dashboard | ✅ |
 | `FASTROUTER_BASE_URL` | FastRouter (default: `https://api.fastrouter.io/v1`) | ✅ |
 | `FASTROUTER_MODEL` | LLM model name (default: `gpt-4o`) | ✅ |
+| `AEGIS_DB_PATH` | Local SQLite database path | Optional |
 
 ## Pending / Next Steps
 
@@ -169,6 +171,28 @@ POST /api/v1/nexus/orchestrate { email_body, branch_id }
 | File | What It Does |
 |------|-------------|
 | `frontend/src/app/page.tsx` | **OVERWRITTEN** — Unified enterprise dashboard for 3 personas (CFO Yield Analytics, Branch Manager Portal, Tenant Perks Portal). Includes live polling and live data integrations. |
+
+### `feature/multi-route-ui` — Multi-Page Route Split
+**Agent:** Copilot | **Status:** ✅ Complete
+
+| File | What It Does |
+|------|-------------|
+| `frontend/src/app/login/page.tsx` | Corporate email/password login with backend auth and role-based routing |
+| `frontend/src/app/(dashboard)/member/page.tsx` | Member workspace: floor plan, booking modal, and support ticket form |
+| `frontend/src/app/(dashboard)/manager/page.tsx` | Manager ops desk: live occupancy, leads table, unread notifications, attendance feed |
+| `frontend/src/app/(dashboard)/cfo/page.tsx` | CFO workspace: yield analytics and accounts receivable |
+| `frontend/src/app/page.tsx` | Root redirect to `/login` |
+| `frontend/src/app/(dashboard)/layout.tsx` | Shared shell removed so each route owns its own polling and spacing |
+| `backend/app/api/v1/endpoints/auth.py` | `POST /api/v1/auth/login` against the SQLite members table |
+| `backend/app/api/v1/endpoints/attendance.py` | `GET /api/v1/attendance` for the manager punch-in feed |
+| `backend/app/api/v1/endpoints/billing.py` | `GET /api/v1/billing/receivables` for CFO AR |
+
+#### Route Split Snapshot
+
+- `login` stores the returned session in `localStorage` and routes by role.
+- `member`, `manager`, and `cfo` each own their own 5-second polling loops.
+- Legacy provider-bound dashboard wrappers were removed from the page shell so the new routes prerender cleanly.
+- Newly seeded SQLite tables now support demo members, attendance logs, and receivables.
 
 # AegiSpace Branch Status — feature/production-svg-ui
 
