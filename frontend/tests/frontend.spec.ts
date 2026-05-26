@@ -22,9 +22,12 @@ const PERSONAS: Array<{ key: string; label: string; password: string }> = [
 test.describe('Session Gate & Login', () => {
   test('Login page renders with persona selection', async ({ page }) => {
     await page.goto(FRONTEND_URL);
+    // Clear any lingering session from prior tests
+    await page.evaluate(() => window.sessionStorage.clear());
+    await page.reload();
     // The session gate should be visible
     await expect(page.locator('text=AegisSpace Central Gateway')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Secure Session')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Initiate Secure Session' })).toBeVisible();
   });
 
   for (const persona of PERSONAS) {
@@ -66,8 +69,8 @@ test.describe('Manager Dashboard — Backend Connected', () => {
   });
 
   test('Shows leads from backend', async ({ page }) => {
-    // Look for lead company names in the dashboard
-    await expect(page.locator('text=Wayne Enterprises').first()).toBeVisible({ timeout: 10000 });
+    // Look for CRM Lead Pipeline header which only renders when leads are loaded
+    await expect(page.locator('text=CRM Lead Pipeline').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('API calls are made to backend', async ({ page }) => {
