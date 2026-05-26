@@ -56,7 +56,7 @@
 | `backend/app/api/v1/endpoints/nexus.py` | **OVERWRITTEN** — Full 4-stage allocation pipeline (AI → inventory → lead → booking) |
 | `backend/app/models/nexus.py` | **UPDATED** — Extended HaltReasons, added inventory/lead/booking response fields |
 | `backend/app/core/config.py` | **UPDATED** — FastRouter settings + `extra="ignore"` pydantic fix |
-| `backend/requirements.txt` | **UPDATED** — Added `openai>=1.60.0` |
+| `backend/requirements.txt` | **UPDATED** — Added `openai>=1.54.0` |
 | `.gitignore` | **NEW** — Prevents `.env` secrets from being committed |
 
 #### Production Pipeline Architecture

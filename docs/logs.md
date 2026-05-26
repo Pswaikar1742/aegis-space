@@ -84,7 +84,7 @@
   - Best-effort rollback on partial write failure
 - **Updated `models/nexus.py`:** New HaltReasons, inventory/lead/booking response fields
 - **Updated `config.py`:** FastRouter settings, `extra="ignore"`, version bump to 1.0.0
-- **Updated `requirements.txt`:** Added `openai>=1.60.0`
+- **Updated `requirements.txt`:** Added `openai>=1.54.0`
 - **Created `.gitignore`:** Prevents `.env` secrets from git tracking
 - Pushed to `origin/feature/production-ai` at commit `f402b4f`
 
