@@ -350,7 +350,7 @@ def _ensure_feature_seed(conn: sqlite3.Connection) -> None:
         )
     else:
         existing_emails = {
-            row[0] for row in cur.execute("SELECT email FROM members").fetchall()
+            row["email"] for row in cur.execute("SELECT email FROM members").fetchall()
         }
         missing_members = [
             ("front-0001", "AegiSpace Front Desk", "front-desk@aegis.local", "AegisSpace2026!FRONT", "front_desk", KALYAN_ID),
