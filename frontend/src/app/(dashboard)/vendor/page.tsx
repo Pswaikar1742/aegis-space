@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ClipboardList, Wrench } from 'lucide-react';
+import AICopilot from '../../../components/AICopilot';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
 import { getDashboardPath, readAuthSession } from '../../../lib/session';
 import type { FacilityTask } from '../../../lib/types';
@@ -141,6 +142,13 @@ export default function VendorPage() {
 
         {statusMessage ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">{statusMessage}</div> : null}
       </div>
+
+      <AICopilot
+        activeRole="vendor"
+        branchId={branchId}
+        memberId={memberId}
+        onRefreshTelemetry={fetchTasks}
+      />
     </div>
   );
 }

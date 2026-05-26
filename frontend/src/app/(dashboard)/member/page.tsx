@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarRange, MapPin, MessageSquare, ShieldCheck } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import AICopilot from '../../../components/AICopilot';
 import FloorMap from '../../../components/FloorMap';
 import { StatusBadge, formatSeatType } from '../../../components/DashboardComponents';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
@@ -354,6 +355,13 @@ export default function MemberDashboard() {
           Daily and monthly slot booking is available directly from the selected space modal.
         </div>
       </div>
+
+      <AICopilot
+        activeRole="member"
+        branchId={branchId}
+        memberId={memberId}
+        onRefreshTelemetry={() => fetchInventory(branchId).then((data) => setInventory(data || [])).catch(() => undefined)}
+      />
     </div>
   );
 }

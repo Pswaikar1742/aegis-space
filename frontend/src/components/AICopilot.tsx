@@ -5,7 +5,7 @@ import React, { useState, useRef, useEffect } from 'react';
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://aegis-space-backend.onrender.com';
 
 interface AICopilotProps {
-  activeRole: 'cfo' | 'manager' | 'tenant_admin' | 'member';
+  activeRole: 'cfo' | 'manager' | 'tenant_admin' | 'member' | 'front_desk' | 'it_admin' | 'vendor';
   branchId: string;
   memberId: string;
   onRefreshTelemetry: () => void;
@@ -15,6 +15,44 @@ interface Message {
   sender: 'user' | 'ai';
   text: string;
 }
+
+const personaPrompts: Record<AICopilotProps['activeRole'], string[]> = {
+  cfo: [
+    'Summarize revenue this week',
+    'What receivables need attention?',
+    'How is occupancy trending?',
+  ],
+  manager: [
+    'Show open maintenance issues',
+    'What needs attention on the floor?',
+    'Summarize today\'s operations',
+  ],
+  tenant_admin: [
+    'How many credits remain?',
+    'What bookings are active?',
+    'How can I optimize usage?',
+  ],
+  member: [
+    'Find me a desk',
+    'Help me book a meeting room',
+    'How do I get a gatepass?',
+  ],
+  front_desk: [
+    'Register a visitor',
+    'Who is currently checked in?',
+    'How do I check someone out?',
+  ],
+  it_admin: [
+    'Show infrastructure health',
+    'Which seats need attention?',
+    'Summarize visitor flow',
+  ],
+  vendor: [
+    'List open work orders',
+    'What is the highest priority task?',
+    'Mark a task complete',
+  ],
+};
 
 export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memberId, onRefreshTelemetry }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -111,6 +149,21 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
 
           {/* Messages Container */}
           <div className="flex-grow p-4 overflow-y-auto space-y-3 bg-slate-50">
+            <div className="rounded-lg border border-slate-200 bg-white p-3 text-[11px] text-slate-500">
+              Try a quick prompt for the {activeRole.replace('_', ' ')} persona:
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(personaPrompts[activeRole] || personaPrompts.member).map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => setInput(prompt)}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] text-slate-700 hover:bg-slate-100"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            </div>
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div

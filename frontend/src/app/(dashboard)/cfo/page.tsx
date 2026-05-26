@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Building2, DollarSign, TrendingUp, Wallet } from 'lucide-react';
+import AICopilot from '../../../components/AICopilot';
 import { StatusBadge, KpiCard } from '../../../components/DashboardComponents';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
 import { getDashboardPath, readAuthSession } from '../../../lib/session';
@@ -176,6 +177,13 @@ export default function CFODashboard() {
 
         {statusMessage ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">{statusMessage}</div> : null}
       </div>
+
+      <AICopilot
+        activeRole="cfo"
+        branchId={branchId}
+        memberId={memberId}
+        onRefreshTelemetry={fetchCfoState}
+      />
     </div>
   );
 }

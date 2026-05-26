@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bell, CheckCircle2, Clock3, LayoutDashboard, ShieldCheck, Wrench } from 'lucide-react';
+import AICopilot from '../../../components/AICopilot';
 import FloorMap from '../../../components/FloorMap';
 import { StatusBadge } from '../../../components/DashboardComponents';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
@@ -291,6 +292,13 @@ export default function ManagerDashboard() {
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">{statusMessage}</div>
         ) : null}
       </div>
+
+      <AICopilot
+        activeRole="manager"
+        branchId={branchId}
+        memberId={memberId}
+        onRefreshTelemetry={fetchManagerState}
+      />
     </div>
   );
 }

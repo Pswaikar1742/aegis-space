@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, UserCheck, Users } from 'lucide-react';
+import AICopilot from '../../../components/AICopilot';
 import { BACKEND_URL, KALYAN_BRANCH_ID } from '../../../lib/constants';
 import { getDashboardPath, readAuthSession } from '../../../lib/session';
 import type { Visitor } from '../../../lib/types';
@@ -146,6 +147,13 @@ export default function FrontDeskPage() {
 
         {statusMessage ? <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">{statusMessage}</div> : null}
       </div>
+
+      <AICopilot
+        activeRole="front_desk"
+        branchId={branchId}
+        memberId={memberId}
+        onRefreshTelemetry={fetchVisitors}
+      />
     </div>
   );
 }
