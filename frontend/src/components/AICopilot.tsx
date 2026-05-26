@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://aegis-space-backend.onrender.com';
 
 interface AICopilotProps {
   activeRole: 'cfo' | 'manager' | 'tenant_admin' | 'member';

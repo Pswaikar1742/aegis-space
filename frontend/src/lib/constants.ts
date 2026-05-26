@@ -1,7 +1,7 @@
 import { LayoutDashboard, Users, BarChart3, Building2, Bell, Search, DollarSign, TrendingUp, CheckCircle2, Shield, Wrench, CreditCard, Printer, Zap, Send, Settings, UserCircle, Briefcase, Activity, LockKeyhole, Fingerprint, ShieldCheck, LogOut, Mail, MapPin, Layers3, CalendarRange } from 'lucide-react';
 import type { Persona } from './types';
 
-export const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+export const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://aegis-space-backend.onrender.com";
 export const KALYAN_BRANCH_ID = "4a7b9c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d";
 export const BKC_BRANCH_ID = "8b9c1d2e-3f4a-5b6c-7d8e-9f0a1b2c3d4e";
 export const HYD_BRANCH_ID = "9c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f";

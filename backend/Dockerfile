@@ -42,10 +42,14 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Copy application code
 COPY ./app ./app
 
+# Writable SQLite location for Docker/Render runs
+RUN mkdir -p /home/aegis/app/data && chown -R aegis:aegis /home/aegis/app/data
+
 # Python optimisations for containers
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH="/home/aegis/app"
+    PYTHONPATH="/home/aegis/app" \
+    AEGIS_DB_PATH="/home/aegis/app/data/aegispace.db"
 
 # Switch to non-root user
 USER aegis

@@ -3,7 +3,7 @@ export type OrchestrateRequest = {
   branch_id: string;
 };
 
-const DEFAULT_API_BASE_URL = "http://localhost:8080";
+const DEFAULT_API_BASE_URL = "https://aegis-space-backend.onrender.com";
 
 function buildApiUrl(pathname: string): string {
   const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;

@@ -22,6 +22,7 @@ def _dict_factory(cursor: sqlite3.Cursor, row: tuple) -> dict:
 
 def get_connection() -> sqlite3.Connection:
     """Create a new SQLite connection with dict row factory."""
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.row_factory = _dict_factory
     conn.execute("PRAGMA journal_mode=WAL")
