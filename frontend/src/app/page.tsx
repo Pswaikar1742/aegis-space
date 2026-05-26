@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import FloorMap, { SPACES as DEMO_SPACES, mapSpaceToInventory } from '../components/FloorMap';
+import { AICopilot } from '../components/AICopilot';
 import type { InventoryItem, BookingRecord, Branch } from '../lib/types';
 import {
   LayoutDashboard, Users, BarChart3, Building2, Bell, Search,
@@ -300,6 +301,8 @@ export default function Home() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [openSlots, setOpenSlots] = useState(0);
   const [toasts, setToasts] = useState<Array<{ id: string; message: string }>>([]);
+
+  const activePersona = (['cfo','manager','tenant_admin','member'].includes(persona) ? persona : 'member') as 'cfo' | 'manager' | 'tenant_admin' | 'member';
 
   useEffect(() => {
     const storedSession = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
@@ -1015,6 +1018,12 @@ export default function Home() {
           {renderDashboard()}
         </main>
       </div>
+      <AICopilot 
+        activeRole={activePersona}
+        branchId={activeBranchId}
+        memberId={STARK_MEMBER_ID}
+        onRefreshTelemetry={fetchState}
+      />
     </div>
   );
 }
