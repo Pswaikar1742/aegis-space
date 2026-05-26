@@ -1,6 +1,6 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from supabase import Client
+from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 from typing import List
 
 from app.core.db import get_supabase_client

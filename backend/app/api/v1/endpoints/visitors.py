@@ -8,7 +8,7 @@ PATCH /api/v1/visitors/{id}  → Check-in or check-out a visitor
 
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status
-from supabase import Client
+from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime

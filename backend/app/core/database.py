@@ -140,6 +140,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     read INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS invoices (
+    id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(4)) || '-' || hex(randomblob(2)) || '-4' || substr(hex(randomblob(2)),2) || '-' || substr('89ab',abs(random()) % 4 + 1, 1) || substr(hex(randomblob(2)),2) || '-' || hex(randomblob(6)))),
+    company_name TEXT NOT NULL,
+    branch_id TEXT NOT NULL REFERENCES branches(id),
+    base_rent REAL NOT NULL DEFAULT 0,
+    incidentals REAL NOT NULL DEFAULT 0,
+    total_due REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_at TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -221,6 +232,37 @@ def _seed(conn: sqlite3.Connection):
     cur.execute(
         "INSERT INTO member_perks (member_id, monthly_credits, printing_quota, active_status) VALUES (?, ?, ?, ?)",
         (STARK_ID, 240, 1000, 1),
+    )
+
+    # Visitors (Front-Desk seed)
+    cur.executemany(
+        "INSERT INTO visitors (id, branch_id, visitor_name, company, purpose, host_member_id, status) VALUES (?,?,?,?,?,?,?)",
+        [
+            (str(uuid.uuid4()), KALYAN_ID, "Tony Stark",       "Stark Industries",  "Facility Tour",     STARK_ID, "pre_registered"),
+            (str(uuid.uuid4()), KALYAN_ID, "Pepper Potts",     "Stark Industries",  "Monthly Check-in",  STARK_ID, "checked_in"),
+            (str(uuid.uuid4()), BKC_ID,    "Norman Osborn",    "Oscorp",            "Sales Meeting",     None,     "pre_registered"),
+            (str(uuid.uuid4()), HYD_ID,    "Lex Luthor",       "LexCorp",           "Site Inspection",   None,     "pre_registered"),
+        ]
+    )
+
+    # Facility Tasks (Vendor seed)
+    cur.executemany(
+        "INSERT INTO facility_tasks (id, branch_id, area, task_type, description, priority, status) VALUES (?,?,?,?,?,?,?)",
+        [
+            (str(uuid.uuid4()), KALYAN_ID, "3rd Floor East Wing",    "cleaning",    "Deep clean carpets and sanitize desks",        "high",    "pending"),
+            (str(uuid.uuid4()), KALYAN_ID, "Conference Room Alpha",  "repair",      "Projector bulb replacement required",          "urgent",  "pending"),
+            (str(uuid.uuid4()), BKC_ID,    "Executive Suite",        "inspection",  "Fire safety inspection due this week",         "normal",  "pending"),
+            (str(uuid.uuid4()), HYD_ID,    "Main Lobby",             "cleaning",    "Evening janitorial sweep and trash collection", "normal",  "pending"),
+        ]
+    )
+
+    # Notifications
+    cur.executemany(
+        "INSERT INTO notifications (id, branch_id, user_id, type, payload, read) VALUES (?,?,?,?,?,?)",
+        [
+            (str(uuid.uuid4()), KALYAN_ID, None, "system_startup",   '{"message": "AegiSpace SQLite backend initialized"}', 0),
+            (str(uuid.uuid4()), KALYAN_ID, None, "booking_created",  '{"message": "Stark Industries contract activated"}',  0),
+        ]
     )
 
     conn.commit()

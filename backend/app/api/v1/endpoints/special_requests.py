@@ -11,7 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from supabase import Client
+from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 
 from app.core.db import get_supabase_client
 

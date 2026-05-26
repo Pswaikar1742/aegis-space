@@ -2,8 +2,7 @@
 AegiSpace — Application Configuration
 
 Loads all environment variables with validation via pydantic-settings.
-All credentials are mandatory; the app will fail-fast at import time
-if they're missing, preventing silent mis-configuration in production.
+SQLite-backed — no external database credentials required.
 """
 
 from functools import lru_cache
@@ -15,19 +14,19 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Immutable, validated application settings sourced from environment."""
 
-    # ── Supabase ──────────────────────────────────────────────────────────
-    SUPABASE_URL: str
-    SUPABASE_KEY: Optional[str] = None          # Publishable key (unused in backend)
-    SUPABASE_SERVICE_KEY: str                    # Service-role key for privileged ops
+    # ── Legacy Supabase (optional — kept for backward compat) ─────────────
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
 
     # ── FastRouter LLM ────────────────────────────────────────────────────
-    FASTROUTER_API_KEY: str
+    FASTROUTER_API_KEY: Optional[str] = None
     FASTROUTER_BASE_URL: str = "https://api.fastrouter.io/v1"
     FASTROUTER_MODEL: str = "gpt-4o"
 
     # ── Application ───────────────────────────────────────────────────────
     APP_NAME: str = "AegiSpace"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     PORT: int = 8080
 

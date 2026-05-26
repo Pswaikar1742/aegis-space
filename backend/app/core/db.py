@@ -19,6 +19,7 @@ class TableBuilder:
         self._select_cols = "*"
         self._insert_data = None
         self._update_data = None
+        self._delete = False
         self._where = []
         self._where_args = []
         self._order_by = None
@@ -39,9 +40,24 @@ class TableBuilder:
         self.action = "UPDATE"
         self._update_data = data
         return self
+
+    def delete(self):
+        self.action = "DELETE"
+        self._delete = True
+        return self
         
     def eq(self, column: str, value: Any):
+        # Handle Python booleans → SQLite integer
+        if isinstance(value, bool):
+            value = 1 if value else 0
         self._where.append(f"{column} = ?")
+        self._where_args.append(value)
+        return self
+
+    def neq(self, column: str, value: Any):
+        if isinstance(value, bool):
+            value = 1 if value else 0
+        self._where.append(f"{column} != ?")
         self._where_args.append(value)
         return self
         
@@ -52,6 +68,33 @@ class TableBuilder:
         placeholders = ",".join(["?"] * len(values))
         self._where.append(f"{column} IN ({placeholders})")
         self._where_args.extend(values)
+        return self
+
+    def gte(self, column: str, value: Any):
+        """Greater than or equal to."""
+        self._where.append(f"{column} >= ?")
+        self._where_args.append(value)
+        return self
+
+    def lte(self, column: str, value: Any):
+        """Less than or equal to."""
+        self._where.append(f"{column} <= ?")
+        self._where_args.append(value)
+        return self
+
+    def gt(self, column: str, value: Any):
+        self._where.append(f"{column} > ?")
+        self._where_args.append(value)
+        return self
+
+    def lt(self, column: str, value: Any):
+        self._where.append(f"{column} < ?")
+        self._where_args.append(value)
+        return self
+
+    def like(self, column: str, pattern: str):
+        self._where.append(f"{column} LIKE ?")
+        self._where_args.append(pattern)
         return self
         
     def order(self, column: str, desc: bool = False):
@@ -66,13 +109,17 @@ class TableBuilder:
     def single(self):
         self._single = True
         return self
+
+    def _build_where(self) -> str:
+        if self._where:
+            return " WHERE " + " AND ".join(self._where)
+        return ""
         
     def execute(self):
         cur = self.conn.cursor()
         if self.action == "SELECT":
             query = f"SELECT {self._select_cols} FROM {self.table_name}"
-            if self._where:
-                query += " WHERE " + " AND ".join(self._where)
+            query += self._build_where()
             if self._order_by:
                 query += f" ORDER BY {self._order_by}"
             if self._limit:
@@ -81,9 +128,21 @@ class TableBuilder:
             cur.execute(query, self._where_args)
             rows = cur.fetchall()
             
+            # Parse JSON strings back into dicts for payload columns
+            parsed_rows = []
+            for row in rows:
+                parsed = dict(row)
+                for key in parsed:
+                    if key == "payload" and isinstance(parsed[key], str):
+                        try:
+                            parsed[key] = json.loads(parsed[key])
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                parsed_rows.append(parsed)
+
             if self._single:
-                return MockResponse(rows[0] if rows else None)
-            return MockResponse(rows)
+                return MockResponse(parsed_rows[0] if parsed_rows else None)
+            return MockResponse(parsed_rows)
             
         elif self.action == "INSERT":
             if isinstance(self._insert_data, dict):
@@ -108,14 +167,26 @@ class TableBuilder:
                     row.append(val)
                 processed_list.append(row)
                 
-            query = f"INSERT INTO {self.table_name} ({','.join(cols)}) VALUES ({placeholders}) RETURNING *"
+            query = f"INSERT INTO {self.table_name} ({','.join(cols)}) VALUES ({placeholders})"
             
             results = []
             for row_data in processed_list:
                 cur.execute(query, row_data)
+                # Fetch the inserted row using rowid
+                last_id = cur.lastrowid
+                # Try to fetch the inserted row. Use rowid as fallback.
+                fetch_query = f"SELECT * FROM {self.table_name} WHERE rowid = ?"
+                cur.execute(fetch_query, [last_id])
                 res = cur.fetchone()
                 if res:
-                    results.append(res)
+                    parsed = dict(res)
+                    for key in parsed:
+                        if key == "payload" and isinstance(parsed[key], str):
+                            try:
+                                parsed[key] = json.loads(parsed[key])
+                            except (json.JSONDecodeError, TypeError):
+                                pass
+                    results.append(parsed)
             self.conn.commit()
             return MockResponse(results)
             
@@ -129,22 +200,45 @@ class TableBuilder:
                 set_clauses.append(f"{k} = ?")
                 if isinstance(v, (dict, list)):
                     v = json.dumps(v)
+                elif isinstance(v, bool):
+                    v = 1 if v else 0
                 set_args.append(v)
                 
             query = f"UPDATE {self.table_name} SET {','.join(set_clauses)}"
-            if self._where:
-                query += " WHERE " + " AND ".join(self._where)
-            query += " RETURNING *"
+            query += self._build_where()
             
             cur.execute(query, set_args + self._where_args)
-            rows = cur.fetchall()
             self.conn.commit()
+
+            # Now fetch the updated rows
+            fetch_query = f"SELECT * FROM {self.table_name}"
+            fetch_query += self._build_where()
+            cur.execute(fetch_query, self._where_args)
+            rows = cur.fetchall()
+
+            parsed_rows = []
+            for row in rows:
+                parsed = dict(row)
+                for key in parsed:
+                    if key == "payload" and isinstance(parsed[key], str):
+                        try:
+                            parsed[key] = json.loads(parsed[key])
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                parsed_rows.append(parsed)
             
             if self._single:
-                return MockResponse(rows[0] if rows else None)
-            return MockResponse(rows)
+                return MockResponse(parsed_rows[0] if parsed_rows else None)
+            return MockResponse(parsed_rows)
+
+        elif self.action == "DELETE":
+            query = f"DELETE FROM {self.table_name}"
+            query += self._build_where()
+            cur.execute(query, self._where_args)
+            self.conn.commit()
+            return MockResponse([])
             
-        raise ValueError("No action specified (SELECT, INSERT, UPDATE)")
+        raise ValueError("No action specified (SELECT, INSERT, UPDATE, DELETE)")
 
 class SQLiteWrapper:
     def __init__(self, conn):
@@ -156,8 +250,7 @@ class SQLiteWrapper:
 # Initialize schema and seed on startup
 init_db()
 
-def get_supabase_client() -> Generator[SQLiteWrapper, None, None]:
-    """Yields a SQLiteWrapper that mocks the Supabase client interface."""
+def get_supabase_client() -> SQLiteWrapper:
+    """Returns a SQLiteWrapper that mocks the Supabase client interface."""
     conn = get_db()
-    yield SQLiteWrapper(conn)
-
+    return SQLiteWrapper(conn)
