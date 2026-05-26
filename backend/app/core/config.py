@@ -8,6 +8,7 @@ SQLite-backed — no external database credentials required.
 from functools import lru_cache
 from typing import Optional
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,6 +52,14 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    @field_validator("FASTROUTER_API_KEY", "FASTROUTER_BASE_URL", "FASTROUTER_MODEL", mode="before")
+    @classmethod
+    def _strip_inline_comments(cls, value):
+        if not isinstance(value, str):
+            return value
+        cleaned = value.split("#", 1)[0].strip()
+        return cleaned or value
 
 
 @lru_cache(maxsize=1)

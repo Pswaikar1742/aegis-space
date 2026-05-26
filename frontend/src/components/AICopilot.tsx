@@ -111,10 +111,15 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
         onRefreshTelemetry(); // Refresh metrics in case an action occurred
       } else {
         const detail = typeof data?.detail === 'string' ? data.detail : 'Integration error from backend.';
-        setMessages(prev => [...prev, { sender: 'ai', text: `Sorry, I encountered an integration error: ${detail}` }]);
+        const userMessage = `Sorry, I encountered an integration error: ${detail} (status ${response.status})`;
+        console.error('AICopilot backend error', response.status, data);
+        setErrorMessage(userMessage);
+        setMessages(prev => [...prev, { sender: 'ai', text: userMessage }]);
       }
     } catch {
-      setErrorMessage(`Connection failed to ${BACKEND_URL}. Verify NEXT_PUBLIC_API_BASE_URL in frontend env and backend CORS.`);
+      const connectionMessage = `Connection failed to ${BACKEND_URL}. Verify NEXT_PUBLIC_API_BASE_URL in frontend env and backend CORS.`;
+      console.error('AICopilot connection failed', connectionMessage);
+      setErrorMessage(connectionMessage);
       setMessages(prev => [...prev, { sender: 'ai', text: 'Could not connect to the Aegis Copilot Gateway.' }]);
     } finally {
       setLoading(false);
@@ -122,7 +127,11 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans">
+    // Keep the copilot offset from the very bottom so it doesn't overlap
+    // the app's floating Logout button. Use a smaller z-index than Logout
+    // so Logout remains clickable if needed, and adjust spacing on small
+    // vs. large screens.
+    <div className="fixed right-6 bottom-12 md:bottom-24 z-30 font-sans">
       {/* Toggle Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
