@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8080';
+
 interface AICopilotProps {
   activeRole: 'cfo' | 'manager' | 'tenant_admin' | 'member';
   branchId: string;
@@ -21,7 +23,14 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setMessages([
+      { sender: 'ai', text: `Hi! I'm your Aegis Copilot. As a ${activeRole.replace('_', ' ')}, how can I assist you today?` }
+    ]);
+  }, [activeRole]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,18 +44,21 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
     e.preventDefault();
     if (!input.trim() || loading) return;
 
+    setErrorMessage('');
+
     const userText = input;
     setMessages(prev => [...prev, { sender: 'user', text: userText }]);
     setInput('');
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8080/api/v1/chat', {
+      const response = await fetch(`${BACKEND_URL}/api/v1/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-User-Role': activeRole,
-          'X-User-ID': memberId
+          'X-User-ID': memberId,
+          'X-Branch-ID': branchId,
         },
         body: JSON.stringify({
           message: userText,
@@ -60,9 +72,11 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
         setMessages(prev => [...prev, { sender: 'ai', text: data.reply }]);
         onRefreshTelemetry(); // Refresh metrics in case an action occurred
       } else {
-        setMessages(prev => [...prev, { sender: 'ai', text: 'Sorry, I encountered an integration error. Please check backend logs.' }]);
+        const detail = typeof data?.detail === 'string' ? data.detail : 'Integration error from backend.';
+        setMessages(prev => [...prev, { sender: 'ai', text: `Sorry, I encountered an integration error: ${detail}` }]);
       }
-    } catch (err) {
+    } catch {
+      setErrorMessage(`Connection failed to ${BACKEND_URL}. Verify NEXT_PUBLIC_API_BASE_URL in frontend env and backend CORS.`);
       setMessages(prev => [...prev, { sender: 'ai', text: 'Could not connect to the Aegis Copilot Gateway.' }]);
     } finally {
       setLoading(false);
@@ -138,6 +152,9 @@ export const AICopilot: React.FC<AICopilotProps> = ({ activeRole, branchId, memb
               Send
             </button>
           </form>
+          {errorMessage ? (
+            <div className="px-3 pb-3 text-[11px] text-rose-600 bg-white">{errorMessage}</div>
+          ) : null}
         </div>
       )}
     </div>
