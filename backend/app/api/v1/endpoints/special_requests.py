@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 
 from app.core.db import get_supabase_client
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,14 @@ async def create_special_request(
         return lead_record
     except Exception as exc:
         logger.exception("Failed to create special request lead")
+        try:
+            await publish_event({
+                "type": "special_request_failed",
+                "branch_id": str(getattr(payload, 'branch_id', '')),
+                "error": str(exc),
+            })
+        except Exception:
+            logger.exception("Failed to publish special_request_failed event")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Upstream database error: {exc}",

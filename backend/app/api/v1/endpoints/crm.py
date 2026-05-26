@@ -5,6 +5,7 @@ from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 from app.core.db import get_supabase_client
 from app.models.crm import LeadStageUpdate, LeadStageOut
 from app.core.auth import require_role
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +40,35 @@ async def update_lead_stage(
             if inventory_ids:
                 if new_status == "closed_won":
                     # Flag inventory as allocated
-                    db.table("inventory_items").update({"status": "allocated"}).in_("id", inventory_ids).execute()
+                    try:
+                        db.table("inventory_items").update({"status": "allocated"}).in_("id", inventory_ids).execute()
+                    except Exception as exc:
+                        logger.exception("Failed to allocate inventory on lead close_won")
+                        try:
+                            await publish_event({
+                                "type": "crm_inventory_update_failed",
+                                "lead_id": lead_id,
+                                "error": str(exc),
+                                "inventory_ids": inventory_ids,
+                            })
+                        except Exception:
+                            logger.exception("Failed to publish crm_inventory_update_failed event")
                     inventory_updated = len(inventory_ids)
                 elif new_status == "workbench_halted":
                     # Release holds -> available
-                    db.table("inventory_items").update({"status": "available"}).in_("id", inventory_ids).execute()
+                    try:
+                        db.table("inventory_items").update({"status": "available"}).in_("id", inventory_ids).execute()
+                    except Exception as exc:
+                        logger.exception("Failed to release inventory on lead halted")
+                        try:
+                            await publish_event({
+                                "type": "crm_inventory_update_failed",
+                                "lead_id": lead_id,
+                                "error": str(exc),
+                                "inventory_ids": inventory_ids,
+                            })
+                        except Exception:
+                            logger.exception("Failed to publish crm_inventory_update_failed event")
                     inventory_updated = len(inventory_ids)
         
         return LeadStageOut(

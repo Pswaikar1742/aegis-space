@@ -78,6 +78,23 @@ export default function MemberDashboard() {
     };
   }, [mounted, branchId]);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const handler = (e: Event) => {
+      const ev = (e as CustomEvent).detail as any;
+      if (!ev || ev.branch_id !== branchId) return;
+      if (['booking_created','booking_cancelled','ticket_created','attendance_punched'].includes(ev.type)) {
+        // refresh inventory and show a lightweight toast
+        fetchInventory(branchId).then((data) => setInventory(data || [])).catch(() => setStatusMessage('Live update failed'));
+        if (ev.type === 'booking_created' && ev.booking && ev.booking.inventory_item_id) {
+          setStatusMessage('Booking confirmed — floor map updated');
+        }
+      }
+    };
+    window.addEventListener('aegis:event', handler as EventListener);
+    return () => window.removeEventListener('aegis:event', handler as EventListener);
+  }, [mounted, branchId]);
+
   const availableCount = useMemo(
     () => inventory.filter((item) => item.status === 'available').length,
     [inventory],

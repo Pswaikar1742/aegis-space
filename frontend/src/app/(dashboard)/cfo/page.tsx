@@ -84,6 +84,19 @@ export default function CFODashboard() {
     };
   }, [mounted, memberId]);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const handler = (e: Event) => {
+      const ev = (e as CustomEvent).detail as any;
+      if (!ev) return;
+      if (['booking_created','booking_cancelled','ticket_created','attendance_punched'].includes(ev.type)) {
+        fetchCfoState().catch(() => setStatusMessage('Live update failed'));
+      }
+    };
+    window.addEventListener('aegis:event', handler as EventListener);
+    return () => window.removeEventListener('aegis:event', handler as EventListener);
+  }, [mounted]);
+
   if (!mounted) {
     return <div className="min-h-screen bg-slate-50" />;
   }

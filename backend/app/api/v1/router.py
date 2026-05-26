@@ -25,6 +25,7 @@ from app.api.v1.endpoints.facility import router as facility_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.attendance import router as attendance_router
 from app.api.v1.endpoints import chat
+from app.api.v1.endpoints.ws import router as ws_router
 
 router = APIRouter(prefix="/api/v1")
 
@@ -46,4 +47,5 @@ router.include_router(facility_router)
 router.include_router(auth_router)
 router.include_router(attendance_router)
 router.include_router(chat.router, prefix="/chat", tags=["Copilot Chat"])
+router.include_router(ws_router, prefix="", tags=["Realtime"])
 

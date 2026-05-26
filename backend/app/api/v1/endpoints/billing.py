@@ -5,6 +5,7 @@ from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 from app.core.db import get_supabase_client
 from app.models.billing import BillingCompileRequest, InvoiceOut
 from app.core.auth import require_role
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +88,34 @@ async def compile_billing(
             "total_due": total_due,
             "status": "draft"
         }
-        invoice_res = db.table("invoices").insert(invoice_row).execute()
-        invoice_data = getattr(invoice_res, "data", None)
-        
-        if not invoice_data:
-            raise HTTPException(status_code=500, detail="Failed to create invoice")
-
-        return InvoiceOut(**invoice_data[0])
+        try:
+            invoice_res = db.table("invoices").insert(invoice_row).execute()
+            invoice_data = getattr(invoice_res, "data", None)
+            if not invoice_data:
+                try:
+                    await publish_event({
+                        "type": "invoice_create_failed",
+                        "branch_id": payload.branch_id,
+                        "error": "insert_returned_no_data",
+                        "payload": invoice_row,
+                    })
+                except Exception:
+                    logger.exception("Failed to publish invoice_create_failed event")
+                raise HTTPException(status_code=500, detail="Failed to create invoice")
+            return InvoiceOut(**invoice_data[0])
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.exception("Failed to insert invoice")
+            try:
+                await publish_event({
+                    "type": "invoice_create_failed",
+                    "branch_id": payload.branch_id,
+                    "error": str(e),
+                })
+            except Exception:
+                logger.exception("Failed to publish invoice_create_failed event")
+            raise HTTPException(status_code=500, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:

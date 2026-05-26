@@ -5,6 +5,7 @@ from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 from app.core.db import get_supabase_client
 from app.models.members import MemberPerksOut, MemberPerksUpdate
 from app.core.auth import require_role
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,27 @@ async def update_member_perks(
         res = db.table("member_perks").update(update_data).eq("member_id", member_id).execute()
         data = getattr(res, "data", None)
         if not data:
+            try:
+                await publish_event({
+                    "type": "member_perks_update_failed",
+                    "member_id": member_id,
+                    "error": "no_data_returned",
+                    "payload": update_data,
+                })
+            except Exception:
+                logger.exception("Failed to publish member_perks_update_failed event")
             raise HTTPException(status_code=404, detail="Member perks not found or update failed")
         return data[0]
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Failed to update perks for {member_id}")
+        try:
+            await publish_event({
+                "type": "member_perks_update_failed",
+                "member_id": member_id,
+                "error": str(e),
+            })
+        except Exception:
+            logger.exception("Failed to publish member_perks_update_failed event")
         raise HTTPException(status_code=500, detail=str(e))

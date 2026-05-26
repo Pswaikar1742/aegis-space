@@ -15,6 +15,7 @@ from datetime import datetime
 
 from app.core.db import get_supabase_client
 from app.core.auth import require_role
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/visitors", tags=["Visitors (Front-Desk)"])
@@ -52,12 +53,29 @@ async def register_visitor(
         res = db.table("visitors").insert(row).execute()
         data = getattr(res, "data", None)
         if not data:
+            try:
+                await publish_event({
+                    "type": "visitor_register_failed",
+                    "branch_id": row.get("branch_id"),
+                    "error": "insert_returned_no_data",
+                    "payload": row,
+                })
+            except Exception:
+                logger.exception("Failed to publish visitor_register_failed event")
             raise HTTPException(status_code=500, detail="Failed to register visitor")
         return data[0]
     except HTTPException:
         raise
     except Exception as e:
         logger.exception("Visitor registration failed")
+        try:
+            await publish_event({
+                "type": "visitor_register_failed",
+                "branch_id": getattr(payload, 'branch_id', None),
+                "error": str(e),
+            })
+        except Exception:
+            logger.exception("Failed to publish visitor_register_failed event")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -97,6 +115,14 @@ async def checkin_visitor(
         raise
     except Exception as e:
         logger.exception("Check-in failed")
+        try:
+            await publish_event({
+                "type": "visitor_checkin_failed",
+                "visitor_id": visitor_id,
+                "error": str(e),
+            })
+        except Exception:
+            logger.exception("Failed to publish visitor_checkin_failed event")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -119,4 +145,12 @@ async def checkout_visitor(
         raise
     except Exception as e:
         logger.exception("Check-out failed")
+        try:
+            await publish_event({
+                "type": "visitor_checkout_failed",
+                "visitor_id": visitor_id,
+                "error": str(e),
+            })
+        except Exception:
+            logger.exception("Failed to publish visitor_checkout_failed event")
         raise HTTPException(status_code=500, detail=str(e))

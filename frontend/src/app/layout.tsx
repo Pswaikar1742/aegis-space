@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import RealtimeConnector from '../components/RealtimeConnector';
+import ToastProvider from '../components/ToastProvider';
+import LogoutButton from '../components/LogoutButton';
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -13,7 +16,11 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en" className={inter.variable}>
       <body className={`${inter.className} antialiased`}>
-        {children}
+        <ToastProvider>
+          {children}
+          <RealtimeConnector />
+          <LogoutButton />
+        </ToastProvider>
       </body>
     </html>
   );

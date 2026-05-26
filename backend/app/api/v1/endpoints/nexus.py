@@ -30,6 +30,7 @@ from app.models.nexus import (
     OrchestrateResponse,
 )
 from app.services.ai_service import AIParserError, parse_deal_signals
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -327,6 +328,15 @@ async def orchestrate(
             logger.warning(
                 "STAGE 4 WARN — booking insert skipped: %s", booking_exc
             )
+            try:
+                await publish_event({
+                    "type": "nexus_booking_failed",
+                    "branch_id": branch_id,
+                    "error": str(booking_exc),
+                    "payload": booking_row,
+                })
+            except Exception:
+                logger.exception("Failed to publish nexus_booking_failed event")
 
         logger.info(
             "STAGE 4 SUCCESS — lead=%s booking=%s item=%s",
@@ -353,6 +363,16 @@ async def orchestrate(
 
     except Exception as exc:
         logger.exception("STAGE 4 HALT — database write failed")
+
+        try:
+            await publish_event({
+                "type": "nexus_allocation_failed",
+                "branch_id": branch_id,
+                "error": str(exc),
+                "extracted": extracted,
+            })
+        except Exception:
+            logger.exception("Failed to publish nexus_allocation_failed event")
 
         # Attempt to rollback inventory status
         try:
@@ -409,4 +429,12 @@ def _try_create_halted_lead(
         return record
     except Exception:
         logger.exception("Failed to create halted lead for %s", company_name)
+        try:
+            await publish_event({
+                "type": "nexus_halted_lead_create_failed",
+                "branch_id": branch_id,
+                "company_name": company_name,
+            })
+        except Exception:
+            logger.exception("Failed to publish nexus_halted_lead_create_failed event")
         return None

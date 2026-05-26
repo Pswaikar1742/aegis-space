@@ -4,6 +4,7 @@ from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 from typing import List
 
 from app.core.db import get_supabase_client
+from app.core.pubsub import publish_event
 from app.models.tickets import TicketCreate, TicketOut
 from app.core.auth import require_role
 
@@ -33,9 +34,28 @@ async def create_ticket(
         data = getattr(res, "data", None)
         if not data:
             raise HTTPException(status_code=500, detail="Failed to create ticket")
+        # publish ticket created event
+        try:
+            await publish_event({
+                "type": "ticket_created",
+                "branch_id": payload.branch_id,
+                "ticket": data[0],
+            })
+        except Exception:
+            logger.exception("Failed to publish ticket_created event")
         return data[0]
     except Exception as e:
         logger.exception("Failed to create ticket")
+        # publish diagnostic event
+        try:
+            await publish_event({
+                "type": "ticket_create_failed",
+                "branch_id": getattr(payload, 'branch_id', None),
+                "error": str(e),
+            })
+        except Exception:
+            logger.exception("Failed to publish ticket_create_failed event")
+
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get(

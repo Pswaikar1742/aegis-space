@@ -90,6 +90,20 @@ export default function ManagerDashboard() {
     };
   }, [mounted, branchId, memberId]);
 
+  useEffect(() => {
+    if (!mounted) return;
+    const handler = (e: Event) => {
+      const ev = (e as CustomEvent).detail as any;
+      if (!ev || ev.branch_id !== branchId) return;
+      if (['booking_created','booking_cancelled','ticket_created','attendance_punched'].includes(ev.type)) {
+        fetchManagerState().catch(() => setStatusMessage('Live update failed'));
+        if (ev.type === 'attendance_punched') setStatusMessage('Employee checked in');
+      }
+    };
+    window.addEventListener('aegis:event', handler as EventListener);
+    return () => window.removeEventListener('aegis:event', handler as EventListener);
+  }, [mounted, branchId, memberId]);
+
   const unreadNotifications = useMemo(() => notifications.filter((item) => !item.read), [notifications]);
 
   const updateLeadStage = async (leadId: string, status: string) => {

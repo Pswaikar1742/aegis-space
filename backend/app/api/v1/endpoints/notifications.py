@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 
 from app.core.db import get_supabase_client
+from app.core.pubsub import publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +50,28 @@ async def mark_notification_read(
     try:
         resp = db.table("notifications").update({"read": True}).eq("id", str(notif_id)).execute()
         if not getattr(resp, "data", None):
+            try:
+                await publish_event({
+                    "type": "notification_mark_read_failed",
+                    "notif_id": str(notif_id),
+                    "error": "not_found_or_no_data",
+                })
+            except Exception:
+                logger.exception("Failed to publish notification_mark_read_failed event")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
         return resp.data[0]
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Failed to mark notification %s read", notif_id)
+        try:
+            await publish_event({
+                "type": "notification_mark_read_failed",
+                "notif_id": str(notif_id),
+                "error": str(exc),
+            })
+        except Exception:
+            logger.exception("Failed to publish notification_mark_read_failed event")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Upstream database error: {exc}",

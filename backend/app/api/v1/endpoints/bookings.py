@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.core.db import SQLiteWrapper as Client  # SQLite-backed
 
 from app.core.db import get_supabase_client
+from app.core.pubsub import publish_event
 from app.core.auth import require_role
 from app.models.bookings import BookingCreate, BookingOut, BookingStatus, BookingUpdate
 
@@ -181,7 +182,8 @@ async def create_booking(
                 detail="Booking insert returned no data",
             )
 
-        # ── Side-effect: create a branch manager notification (best-effort) ──
+
+        # ── Side-effect: create a branch manager notification and publish event ──
         try:
             created_booking = insert_response.data[0]
             notif_row = {
@@ -197,14 +199,40 @@ async def create_booking(
                     "end_date": created_booking.get("end_date"),
                 },
             }
-            db.table("notifications").insert(notif_row).execute()
+            try:
+                db.table("notifications").insert(notif_row).execute()
+            except Exception:
+                logger.exception("Failed to insert notification (non-fatal)")
+
+            # publish booking created event
+            try:
+                await publish_event({
+                    "type": "booking_created",
+                    "branch_id": str(payload.branch_id),
+                    "booking": created_booking,
+                })
+            except Exception:
+                logger.exception("Failed to publish booking_created event")
         except Exception:
             logger.exception("Failed to create booking notification (non-fatal)")
 
         # ── Step 4: Mark inventory as allocated ───────────────────────────
-        db.table("inventory_items").update({"status": "allocated"}).eq(
-            "id", str(payload.inventory_item_id)
-        ).execute()
+        try:
+            db.table("inventory_items").update({"status": "allocated"}).eq(
+                "id", str(payload.inventory_item_id)
+            ).execute()
+        except Exception as exc:
+            logger.exception("Failed to mark inventory allocated for %s", payload.inventory_item_id)
+            # publish failure event for UI diagnostics
+            try:
+                await publish_event({
+                    "type": "booking_failed",
+                    "branch_id": str(payload.branch_id),
+                    "error": f"inventory_update_failed: {exc}",
+                    "booking": insert_response.data[0] if getattr(insert_response, 'data', None) else None,
+                })
+            except Exception:
+                logger.exception("Failed to publish booking_failed event (inventory update)")
 
         logger.info(
             "Booking created: item=%s lead=%s value=%.2f",
@@ -219,6 +247,20 @@ async def create_booking(
         raise
     except Exception as exc:
         logger.exception("Failed to create booking")
+        # publish a booking_failed diagnostic event
+        try:
+            await publish_event({
+                "type": "booking_failed",
+                "branch_id": str(getattr(payload, 'branch_id', 'unknown')),
+                "error": str(exc),
+                "payload": {
+                    "inventory_item_id": str(getattr(payload, 'inventory_item_id', '')),
+                    "member_id": user_auth.get('user_id') if isinstance(user_auth, dict) else None,
+                },
+            })
+        except Exception:
+            logger.exception("Failed to publish booking_failed event")
+
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Upstream database error: {exc}",
@@ -294,6 +336,17 @@ async def update_booking(
         )
 
         if not update_response.data:
+            # publish failure diagnostic
+            try:
+                await publish_event({
+                    "type": "booking_update_failed",
+                    "booking_id": str(booking_id),
+                    "error": "Booking update returned no data",
+                    "payload": update_data,
+                })
+            except Exception:
+                logger.exception("Failed to publish booking_update_failed event")
+
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Booking update returned no data",
@@ -302,14 +355,34 @@ async def update_booking(
         # ── Side-effect: release inventory on cancellation ────────────────
         if payload.status == BookingStatus.CANCELLED:
             inv_item_id = existing.data["inventory_item_id"]
-            db.table("inventory_items").update({"status": "available"}).eq(
-                "id", inv_item_id
-            ).execute()
-            logger.info(
-                "Booking %s cancelled — inventory %s released",
-                booking_id,
-                inv_item_id,
-            )
+            try:
+                db.table("inventory_items").update({"status": "available"}).eq(
+                    "id", inv_item_id
+                ).execute()
+                logger.info(
+                    "Booking %s cancelled — inventory %s released",
+                    booking_id,
+                    inv_item_id,
+                )
+                try:
+                    await publish_event({
+                        "type": "booking_cancelled",
+                        "branch_id": existing.data.get("branch_id"),
+                        "booking_id": str(booking_id),
+                        "inventory_item_id": inv_item_id,
+                    })
+                except Exception:
+                    logger.exception("Failed to publish booking_cancelled event")
+            except Exception as exc:
+                logger.exception("Failed to release inventory for cancelled booking %s", booking_id)
+                try:
+                    await publish_event({
+                        "type": "booking_cancel_failed",
+                        "booking_id": str(booking_id),
+                        "error": str(exc),
+                    })
+                except Exception:
+                    logger.exception("Failed to publish booking_cancel_failed event")
 
         return BookingOut(**update_response.data[0])
 
